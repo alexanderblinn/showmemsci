@@ -1,74 +1,462 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MSCI World Index</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        .report {
-            margin-bottom: 40px;
-        }
-        hr {
-            border: none;
-            height: 1px;
-            background-color: #000;
-            margin: 40px 0;
-        }
-        iframe {
-            width: 100%;
-            aspect-ratio: 20/9;
-            border: none;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>ShowMeMSCI — Lines don't lie</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --bg-elev: #0f141b;
+      --card: #131a22;
+      --text: #e6edf3;
+      --muted: #9aa4b2;
+      --accent: #64b5ff;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --gap: 28px;
+      --maxw: 1100px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      background: radial-gradient(1200px 800px at 70% -10%, #123 0%, transparent 60%),
+                  radial-gradient(900px 600px at -10% 10%, #1b2430 0%, transparent 50%),
+                  var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      margin: 0;
+      font: 500 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      letter-spacing: 0.2px;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      scroll-behavior: smooth;
+    }
+
+	.header {
+	  position: fixed;
+	  top: 0;
+	  left: 0;
+	  right: 0;
+	  z-index: 1000;
+	  background: color-mix(in oklab, var(--bg-elev) 85%, transparent);
+	  border-bottom: 1px solid var(--border);
+	  backdrop-filter: saturate(120%) blur(8px);
+	}
+	.container {
+	  padding-top: 40px;
+	}
+	.hero {
+	  margin-top: 60px;
+	}
+
+    .header__inner {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand__title {
+      margin: 0;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      font-size: clamp(18px, 2vw, 22px);
+    }
+
+    .brand__subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .nav {
+      display: none;
+      gap: 14px;
+    }
+
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 8px 10px;
+      border-radius: 8px;
+      transition: color 160ms ease, background 160ms ease;
+      border: 1px solid transparent;
+    }
+
+    .nav a:focus-visible,
+    .nav a:hover {
+      color: var(--text);
+      background: color-mix(in oklab, var(--card) 75%, transparent);
+      border-color: var(--border);
+      outline: none;
+    }
+
+    @media (min-width: 860px) {
+      .nav { display: flex; }
+    }
+
+    .container {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 28px 20px 80px;
+    }
+
+    .hero {
+      padding: 28px 0 8px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 40px);
+      line-height: 1.2;
+      letter-spacing: 0.2px;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 65ch;
+    }
+
+    .divider {
+      height: 1px;
+      margin: 22px 0 28px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--border-strong) 20%,
+        var(--border) 50%,
+        var(--border-strong) 80%,
+        transparent 100%
+      );
+    }
+
+    .grid {
+      display: grid;
+      gap: var(--gap);
+    }
+
+    .card {
+      background: linear-gradient(180deg, color-mix(in oklab, var(--card) 92%, transparent), var(--card));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: clip;
+    }
+
+    .card__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in oklab, var(--bg-elev) 88%, transparent);
+    }
+
+    .card__title {
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .card__actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: color-mix(in oklab, var(--card) 80%, transparent);
+      color: var(--text);
+      font: inherit;
+      font-size: 12.5px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 80ms ease;
+    }
+    .btn:hover { border-color: var(--border-strong); }
+    .btn:active { transform: translateY(1px); }
+    .btn:focus-visible {
+      outline: 2px solid color-mix(in oklab, var(--accent) 70%, white);
+      outline-offset: 2px;
+    }
+
+    .frame {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: none;
+      background: #0a0f14;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+
+    .frame--tall {
+      aspect-ratio: 16 / 20; /* for heatmap or vertical visualizations */
+    }
+
+    .caption {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 10px 16px 14px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .footer {
+      max-width: var(--maxw);
+      margin: 40px auto 80px;
+      padding: 0 20px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    /* Accessibility and motion */
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
 </head>
 <body>
-    <h1>ShowMeMSCI.com -- Lines don't Lie</h1>
+  <!-- Sticky header -->
+  <header class="header" role="banner">
+    <div class="header__inner">
+      <div class="brand">
+        <h2 class="brand__title">ShowMeMSCI.com</h2>
+        <p class="brand__subtitle">Lines don’t lie</p>
+      </div>
 
-    <!-- Graph 1 -->
-    <div class="report">
-        <iframe src="img/single.html"></iframe>
+      <nav class="nav" aria-label="Sections">
+        <a href="#g1">Single</a>
+        <a href="#g2">Multiple</a>
+        <a href="#g3">Long‑term</a>
+        <a href="#g4">Returns I</a>
+        <a href="#g5">Returns II</a>
+        <a href="#g6">Heatmap</a>
+      </nav>
     </div>
-	<hr>
-	
-	<!-- Graph 2 -->
-    <div class="report">
-        <iframe src="img/multiple.html"></iframe>
-    </div>
-    <hr>
+  </header>
 
-    <!-- Graph 3 -->
-    <div class="report">
-        <iframe src="img/long-term.html"></iframe>
-    </div>
-    <hr>
+  <main class="container" role="main">
+    <section class="hero" aria-describedby="intro">
+      <h1>MSCI World Index</h1>
+      <p id="intro">One‑pager for essential MSCI World insights.</p>
+    </section>
 
-    <!-- Graph 4 -->
-    <div class="report">
-        <iframe src="img/returns-one.html"></iframe>
-    </div>
-    <hr>
+    <div class="divider" aria-hidden="true"></div>
 
-    <!-- Graph 5 -->
-    <div class="report">
-        <iframe src="img/returns-two.html"></iframe>
-    </div>
-    <hr>
+    <section class="grid" aria-label="Diagrams">
+      <!-- Graph 1 -->
+      <article id="g1" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Graph 1 — Single</h3>
+		  <div class="card__actions">
+			<button class="btn" onclick="document.getElementById('frame1').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+			<button class="btn" onclick="fullscreen(document.getElementById('frame1'))">Fullscreen</button>
+			<button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+		</div>
+        </header>
+        <iframe
+          id="frame1"
+          class="frame"
+          src="img/single.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram — Single">
+        </iframe>
+      </article>
 
-    <!-- Graph 6 -->
-    <div class="report">
-        <iframe src="img/heatmap.html" style="aspect-ratio: 16/20;"></iframe>
-    </div>
-    <hr>
+      <!-- Graph 2 -->
+      <article id="g2" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Graph 2 — Multiple</h3>
+		  <div class="card__actions">
+			<button class="btn" onclick="document.getElementById('frame2').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+			<button class="btn" onclick="fullscreen(document.getElementById('frame2'))">Fullscreen</button>
+			<button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+		</div>
+        </header>
+        <iframe
+          id="frame2"
+          class="frame"
+          src="img/multiple.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram — Multiple">
+        </iframe>
+      </article>
+
+      <!-- Graph 3 -->
+      <article id="g3" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Graph 3 — Long‑term</h3>
+		  <div class="card__actions">
+			<button class="btn" onclick="document.getElementById('frame3').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+			<button class="btn" onclick="fullscreen(document.getElementById('frame3'))">Fullscreen</button>
+			<button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+		</div>
+        </header>
+        <iframe
+          id="frame3"
+          class="frame"
+          src="img/long-term.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram — Long‑term">
+        </iframe>
+      </article>
+
+      <!-- Graph 4 -->
+      <article id="g4" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Graph 4 — Returns I</h3>
+		  <div class="card__actions">
+			<button class="btn" onclick="document.getElementById('frame4').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+			<button class="btn" onclick="fullscreen(document.getElementById('frame4'))">Fullscreen</button>
+			<button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+		</div>
+        </header>
+        <iframe
+          id="frame4"
+          class="frame"
+          src="img/returns-one.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram — Returns I">
+        </iframe>
+      </article>
+
+      <!-- Graph 5 -->
+      <article id="g5" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Graph 5 — Returns II</h3>
+		  <div class="card__actions">
+			<button class="btn" onclick="document.getElementById('frame5').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+			<button class="btn" onclick="fullscreen(document.getElementById('frame5'))">Fullscreen</button>
+			<button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+		</div>
+        </header>
+        <iframe
+          id="frame5"
+          class="frame"
+          src="img/returns-two.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram — Returns II">
+        </iframe>
+      </article>
+
+      <!-- Graph 6 -->
+      <article id="g6" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Graph 6 — Heatmap</h3>
+		  <div class="card__actions">
+			<button class="btn" onclick="document.getElementById('frame6').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+			<button class="btn" onclick="fullscreen(document.getElementById('frame6'))">Fullscreen</button>
+			<button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+		</div>
+        </header>
+        <iframe
+          id="frame6"
+          class="frame frame--tall"
+          src="img/heatmap.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram — Heatmap (tall)">
+        </iframe>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <span>© <span id="yy"></span> ShowMeMSCI.com</span>
+    <span>
+	  Open Source on
+	  <a href="https://github.com/alexanderblinn/showmemsci" target="_blank" rel="noopener noreferrer" style="color: #64b5ff; text-decoration: none;">
+	    GitHub
+	  </a>
+    </span>
+  </footer>
+
+  <script>
+    // Set year in footer
+    document.getElementById('yy').textContent = new Date().getFullYear();
+  </script>
+  
+  <script>
+  function fullscreen(element) {
+    if (!element) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      element.requestFullscreen().catch(err => {
+        console.warn("Fullscreen failed:", err);
+      });
+    }
+  }
+</script>
+
+<script>
+  function scrollToFrame(id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function toggleFullscreen(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      el.requestFullscreen().catch(err => {
+        console.warn("Fullscreen failed:", err);
+      });
+    }
+  }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+</script>
 
 </body>
 </html>
