@@ -16,9 +16,18 @@ DATA_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
 SAVE_HTML_TO = WORKING_DIR / "img" / "heatmap.html"
 
 
-def build_colorscale(colors: list[str]) -> list[tuple[float, str]]:
+def build_colorscale(
+    colors: list[str], pivot_index: int | None = None, pivot_position: float = 0.5
+) -> list[tuple[float, str]]:
     """Convert a discrete palette into a Plotly colorscale."""
-    positions = np.linspace(0, 1, len(colors))
+    if pivot_index is None:
+        positions = np.linspace(0, 1, len(colors))
+    else:
+        pivot_index = max(0, min(len(colors) - 1, pivot_index))
+        pivot_position = max(0.0, min(1.0, pivot_position))
+        left = np.linspace(0, pivot_position, pivot_index + 1)
+        right = np.linspace(pivot_position, 1, len(colors) - pivot_index)
+        positions = np.concatenate([left, right[1:]])
     return list(zip(positions, colors))
 
 
@@ -85,6 +94,11 @@ def build_figure(
     total_hover_text[finite_mask] = [f"{value:+.2%}" for value in z_total[finite_mask]]
 
     colorscale = build_colorscale(theme.INTERVAL_COLORS)
+    total_colorscale = build_colorscale(
+        theme.INTERVAL_COLORS,
+        pivot_index=theme.INTERVAL_COLORS.index(theme.NEUTRAL),
+        pivot_position=0.14,
+    )
 
     fig = go.Figure(
         data=[
@@ -111,7 +125,7 @@ def build_figure(
                 x=x_years,
                 y=y_years,
                 text=total_hover_text,
-                colorscale=colorscale,
+                colorscale=total_colorscale,
                 zmin=float(np.nanmin(z_total_scaled)),
                 zmax=float(np.nanmax(z_total_scaled)),
                 zmid=0,
