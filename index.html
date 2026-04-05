@@ -189,6 +189,10 @@
       font-size: 17px;
     }
 
+    .hero__note {
+      font-size: 13px;
+    }
+
     .divider {
       height: 1px;
       margin: 0 0 30px;
@@ -287,15 +291,19 @@
       display: block;
       width: 100%;
       aspect-ratio: 16 / 11;
-      min-height: 360px;
       border: none;
       background: #f1ece1;
       border-radius: 0 0 var(--radius) var(--radius);
+      opacity: 0;
+      transition: opacity 120ms ease-out;
     }
 
     .frame--tall {
       aspect-ratio: 16 / 20;
-      min-height: 560px;
+    }
+
+    .frame.is-ready {
+      opacity: 1;
     }
 
     .card__link {
@@ -377,23 +385,6 @@
     }
 
     @media (max-width: 760px) {
-      .card__head {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .card__actions {
-        flex-wrap: wrap;
-      }
-
-      .frame {
-        min-height: 420px;
-      }
-
-      .frame--tall {
-        min-height: 640px;
-      }
-
       .footer {
         flex-direction: column;
         align-items: flex-start;
@@ -444,6 +435,7 @@
       <p class="eyebrow">Global equities across cycles</p>
       <h1>MSCI World Index</h1>
       <p id="intro">Six interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, the holding-period return envelope, and the return triangle.</p>
+      <p class="hero__note">On mobile devices, desktop mode is recommended.</p>
     </section>
 
     <div class="divider" aria-hidden="true"></div>
@@ -577,28 +569,11 @@
   </script>
 
   <script>
-    function setFrameHeights() {
-      const frames = document.querySelectorAll('.frame');
-      const mobile = window.matchMedia('(max-width: 760px)').matches;
-      const compact = window.matchMedia('(max-width: 1024px)').matches;
-
-      frames.forEach(frame => {
-        if (!compact || document.fullscreenElement === frame) {
-          frame.style.height = '';
-          return;
-        }
-
-        const width = frame.clientWidth;
-        if (!width) return;
-
-        const tall = frame.classList.contains('frame--tall');
-        const baseRatio = tall ? 20 / 16 : 11 / 16;
-        const chromeAllowance = mobile ? (tall ? 300 : 230) : (tall ? 220 : 170);
-        const minHeight = mobile ? (tall ? 760 : 540) : (tall ? 680 : 500);
-        const height = Math.max(Math.round(width * baseRatio + chromeAllowance), minHeight);
-        frame.style.height = `${height}px`;
-      });
-    }
+    document.querySelectorAll('.frame').forEach(frame => {
+      frame.addEventListener('load', () => {
+        frame.classList.add('is-ready');
+      }, { once: true });
+    });
 
     function fullscreen(element) {
       if (!element) return;
@@ -610,15 +585,6 @@
         });
       }
     }
-
-    window.addEventListener('load', () => {
-      setFrameHeights();
-      document.querySelectorAll('.frame').forEach(frame => {
-        frame.addEventListener('load', setFrameHeights);
-      });
-    });
-    window.addEventListener('resize', setFrameHeights);
-    document.addEventListener('fullscreenchange', setFrameHeights);
   </script>
 </body>
 </html>

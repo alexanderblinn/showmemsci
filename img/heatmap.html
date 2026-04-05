@@ -24,6 +24,7 @@
       --muted: rgba(35, 48, 59, 0.68);
       --line: rgba(35, 48, 59, 0.12);
       --shadow: 0 20px 48px rgba(18, 24, 30, 0.16);
+      --responsive-chart-height: clamp(720px, 140vw, 980px);
     }
 
     * {
@@ -182,6 +183,30 @@
       display: none !important;
     }
 
+    @media (max-width: 1024px) {
+      html,
+      body {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+      }
+
+      body::before {
+        position: absolute;
+      }
+
+      .sheet {
+        height: auto;
+        min-height: 0;
+        grid-template-rows: auto auto auto auto;
+      }
+
+      .chart-shell {
+        height: var(--responsive-chart-height);
+        min-height: var(--responsive-chart-height);
+      }
+    }
+
     @media (max-width: 760px) {
       .title-row {
         display: grid;
@@ -236,6 +261,24 @@
         });
       };
 
+      const reportFrameHeight = function () {
+        if (window.self === window.top) return;
+        const docEl = document.documentElement;
+        const body = document.body;
+        const height = Math.max(
+          docEl ? docEl.scrollHeight : 0,
+          docEl ? docEl.offsetHeight : 0,
+          body ? body.scrollHeight : 0,
+          body ? body.offsetHeight : 0
+        );
+        if (height > 0) {
+          window.parent.postMessage({
+            type: "showmemsci:frame-height",
+            height: height
+          }, "*");
+        }
+      };
+
       const syncBarText = function () {
         if (!window.Plotly || barTextBreakpoint === null) return Promise.resolve();
         const barIndices = chart.data
@@ -255,17 +298,35 @@
       };
 
       const syncPlotSize = function () {
-        if (!shell || !window.Plotly) return;
+        if (!shell || !window.Plotly) {
+          reportFrameHeight();
+          return;
+        }
         Plotly.relayout(chart, {
           width: Math.max(320, shell.clientWidth - 2),
           height: Math.max(320, shell.clientHeight - 2)
         })
           .then(syncBarText)
-          .then(applyFinish);
+          .then(applyFinish)
+          .then(reportFrameHeight);
       };
 
       syncPlotSize();
       window.addEventListener("resize", syncPlotSize);
+      window.addEventListener("load", reportFrameHeight);
+      window.setTimeout(reportFrameHeight, 160);
+      window.setTimeout(reportFrameHeight, 700);
+
+      if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(reportFrameHeight);
+        resizeObserver.observe(document.documentElement);
+        if (document.body) {
+          resizeObserver.observe(document.body);
+        }
+        if (shell) {
+          resizeObserver.observe(shell);
+        }
+      }
 
       if (chart.on) {
         chart.on("plotly_afterplot", applyFinish);
