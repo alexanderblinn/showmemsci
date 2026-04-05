@@ -6,7 +6,24 @@
     name="viewport"
     content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
-  <title>ShowMeMSCI | MSCI World Index</title>
+  <title>ShowMeMSCI | MSCI World Index Charts</title>
+  <meta
+    name="description"
+    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, holding-period return envelope, and return triangle." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="https://showmemsci.com/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ShowMeMSCI" />
+  <meta property="og:title" content="ShowMeMSCI | MSCI World Index Charts" />
+  <meta
+    property="og:description"
+    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, holding-period return envelope, and return triangle." />
+  <meta property="og:url" content="https://showmemsci.com/" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="ShowMeMSCI | MSCI World Index Charts" />
+  <meta
+    name="twitter:description"
+    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, holding-period return envelope, and return triangle." />
   <style>
     :root {
       --ink: #23303b;
@@ -279,6 +296,37 @@
       aspect-ratio: 16 / 20;
     }
 
+    .card__copy {
+      display: grid;
+      gap: 10px;
+      padding: 14px 16px 18px;
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .card__copy p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .card__link {
+      width: fit-content;
+      color: var(--ink);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(35, 48, 59, 0.24);
+      font: 600 12px/1.3 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .card__link:hover,
+    .card__link:focus-visible {
+      border-bottom-color: rgba(35, 48, 59, 0.5);
+      outline: none;
+    }
+
     .footer {
       max-width: var(--maxw);
       margin: 24px auto 32px;
@@ -391,7 +439,7 @@
     <section class="hero" aria-describedby="intro">
       <p class="eyebrow">Global equities across cycles</p>
       <h1>MSCI World Index</h1>
-      <p id="intro">Six complementary views on the MSCI World record, from daily price behavior to annual dispersion and the long-run effect of time in the market.</p>
+      <p id="intro">Six interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, the holding-period return envelope, and the return triangle.</p>
     </section>
 
     <div class="divider" aria-hidden="true"></div>
@@ -414,6 +462,10 @@
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Return Bands">
         </iframe>
+        <div class="card__copy">
+          <p>The MSCI World return bands show that positive years were more frequent than negative years, 39 versus 14. Annual returns still ranged from -42% to +39%.</p>
+          <a class="card__link" href="img/returns-one.html">Open standalone chart</a>
+        </div>
       </article>
 
       <article id="g2" class="card">
@@ -433,6 +485,10 @@
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Long-Term Trend">
         </iframe>
+        <div class="card__copy">
+          <p>The MSCI World long-term trend shows that cumulative growth outweighed even major interim drawdowns. Over the full sample, the index rose by roughly 40x.</p>
+          <a class="card__link" href="img/single.html">Open standalone chart</a>
+        </div>
       </article>
 
       <article id="g3" class="card">
@@ -452,6 +508,10 @@
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Yearly Trends">
         </iframe>
+        <div class="card__copy">
+          <p>The MSCI World yearly paths show that annual returns vary widely from year to year. The long-run 7-8% nominal average is rarely observed in any single year.</p>
+          <a class="card__link" href="img/multiple.html">Open standalone chart</a>
+        </div>
       </article>
 
       <article id="g4" class="card">
@@ -471,6 +531,10 @@
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Long-Horizon Return Envelope">
         </iframe>
+        <div class="card__copy">
+          <p>The MSCI World holding-period return envelope shows that timing risk fades with longer holding periods. After 15 years, even the weakest historical start remained positive.</p>
+          <a class="card__link" href="img/long-term.html">Open standalone chart</a>
+        </div>
       </article>
 
       <article id="g5" class="card">
@@ -490,6 +554,10 @@
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Annual Returns">
         </iframe>
+        <div class="card__copy">
+          <p>The MSCI World annual returns chart shows that gains and losses were clustered rather than evenly distributed over time. Stronger and weaker years appeared in distinct phases.</p>
+          <a class="card__link" href="img/returns-two.html">Open standalone chart</a>
+        </div>
       </article>
 
       <article id="g6" class="card">
@@ -509,6 +577,10 @@
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Return Triangle">
         </iframe>
+        <div class="card__copy">
+          <p>The MSCI World return triangle shows that the starting year mattered most over short horizons. As the holding period lengthened, the dispersion of outcomes narrowed materially.</p>
+          <a class="card__link" href="img/heatmap.html">Open standalone chart</a>
+        </div>
       </article>
     </section>
   </main>

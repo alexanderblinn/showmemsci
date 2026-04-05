@@ -10,6 +10,7 @@ This module centralizes:
 
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +29,7 @@ NEUTRAL = "#B59B74"
 POSITIVE_SOFT = "#8AA8A8"
 POSITIVE = "#587A86"
 POSITIVE_DARK = "#456674"
+SITE_URL = "https://showmemsci.com"
 
 INTERVAL_COLORS = [
     "#60434F",
@@ -123,6 +125,19 @@ def style_updatemenus(updatemenus: list) -> list[dict]:
         )
         styled.append(merge_dicts(defaults, menu_dict))
     return styled
+
+
+def canonical_url_for_path(output_path: Path) -> str:
+    """Resolve a site-relative output path to its public canonical URL."""
+    try:
+        relative_path = output_path.resolve().relative_to(Path.cwd().resolve())
+    except ValueError:
+        relative_path = Path(output_path.name)
+
+    relative_url = relative_path.as_posix()
+    if relative_url in {"", ".", "index.html"}:
+        return f"{SITE_URL}/"
+    return f"{SITE_URL}/{relative_url}"
 
 
 def style_sliders(sliders: list) -> list[dict]:
@@ -240,13 +255,30 @@ def render_html(
     meta_html = "".join(
         f'<span class="meta-pill">{label}</span>' for label in meta_items if label
     )
+    page_title = f"{title} | ShowMeMSCI"
+    description = " ".join(deck.split()) or f"Interactive MSCI World chart: {title}."
+    canonical_url = canonical_url_for_path(save_to)
+    page_title_html = escape(page_title, quote=True)
+    description_html = escape(description, quote=True)
+    canonical_url_html = escape(canonical_url, quote=True)
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{title}</title>
+  <title>{page_title_html}</title>
+  <meta name="description" content="{description_html}" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="{canonical_url_html}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ShowMeMSCI" />
+  <meta property="og:title" content="{page_title_html}" />
+  <meta property="og:description" content="{description_html}" />
+  <meta property="og:url" content="{canonical_url_html}" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="{page_title_html}" />
+  <meta name="twitter:description" content="{description_html}" />
   <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
   <style>
     :root {{
