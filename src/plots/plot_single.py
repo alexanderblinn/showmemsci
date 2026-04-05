@@ -141,7 +141,7 @@ def main() -> None:
     theme.render_html(
         fig,
         SAVE_HTML_TO,
-        eyebrow="MSCI World Index",
+        eyebrow="Over decades, cumulative growth outweighs even major market declines.",
         title="MSCI World Long-Term Trend",
         deck=(
             "A stripped-back view of the MSCI World path over time. The same "

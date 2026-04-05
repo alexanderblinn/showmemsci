@@ -353,7 +353,7 @@ def main() -> None:
     theme.render_html(
         fig,
         SAVE_HTML_TO,
-        eyebrow="MSCI World Index",
+        eyebrow="Positive years outnumbered negative years, 39 to 14, while annual returns ranged from -42% to +39%.",
         title="MSCI World Return Bands",
         deck=(
             "Each block represents a specific year, showing its annual return "

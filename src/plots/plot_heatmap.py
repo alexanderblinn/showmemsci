@@ -220,8 +220,8 @@ def main() -> None:
     theme.render_html(
         fig,
         SAVE_HTML_TO,
-        eyebrow="MSCI World Index",
-        title="Return Triangle",
+        eyebrow="Outcome dispersion was highest over short holding periods and declined as the investment horizon lengthened.",
+        title="MSCI World Return Triangle",
         deck=(
             "Every cell represents an investment window defined by its start year "
             "and holding period. The heatmap reveals how quickly weak entry years "

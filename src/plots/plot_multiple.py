@@ -293,7 +293,7 @@ def main() -> None:
     theme.render_html(
         fig,
         SAVE_HTML_TO,
-        eyebrow="MSCI World Index",
+        eyebrow="Yearly returns are highly dispersed; the long-run average is rarely a typical one-year outcome.",
         title="MSCI World Yearly Trends",
         deck=(
             "Each line resets to the first trading day of its calendar year. "

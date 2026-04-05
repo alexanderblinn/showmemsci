@@ -218,8 +218,8 @@ def main() -> None:
     theme.render_html(
         fig,
         SAVE_HTML_TO,
-        eyebrow="MSCI World Index",
-        title="Annual Returns by Year",
+        eyebrow="Annual returns were not evenly distributed over time, but concentrated in stronger and weaker periods.",
+        title="MSCI World Annual Returns",
         deck=(
             "The annual return history is shown one year at a time instead. "
             "This view makes the sequence of crises, rebounds, and "

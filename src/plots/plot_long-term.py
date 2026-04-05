@@ -148,8 +148,8 @@ def main() -> None:
     theme.render_html(
         fig,
         SAVE_HTML_TO,
-        eyebrow="MSCI World Index",
-        title="Long-Horizon Return Envelope",
+        eyebrow="With longer holding periods, timing risk fades; after 15 years even the worst start was still positive.",
+        title="MSCI World Return Envelope",
         deck=(
             "The chart compresses every rolling holding period into three lines: "
             "the best annualized outcome, the worst, and the average. The spread "
