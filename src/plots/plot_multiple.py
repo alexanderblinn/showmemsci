@@ -1,345 +1,317 @@
 """
-MSCI World Daily Yearly Profiles Visualization
-
-This script loads daily MSCI World Index data, normalizes returns per calendar year,
-and produces an interactive Plotly HTML chart with both additive and multiplicative
-(log2) return scales. A slider highlights a selected year's trace, and hover interactions
-enhance readability.
-
-Author: Alexander Blinn
+Render yearly MSCI World return profiles in the shared editorial theme.
 """
 
-# --- Imports & Locale Setup -----------------------------------------------
-import locale
+from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.io as pio
+import theme
 
-# Ensure US locale for full month names
-locale.setlocale(locale.LC_TIME, "us_US.UTF-8")
-
-# --- Highlight & Default Style Settings ----------------------------------
-HIGHLIGHT_WIDTH = 4  # Line width when highlighted
-HIGHLIGHT_COLOR = "#000000"  # Color when highlighted
-HIGHLIGHT_OPACITY = 1.0  # Opacity when highlighted
-
-LINE_COLOR = "#000000"  # Base line color
-LINE_WIDTH = 10  # Base line width
-LINE_OPACITY = 0.15  # Base opacity for non-highlighted lines
-
-# --- Paths & Data Loading ------------------------------------------------
 WORKING_DIR = Path.cwd()
 DATA_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
 SAVE_HTML_TO = WORKING_DIR / "img" / "multiple.html"
 
-try:
-    # Skip metadata rows and parse dates
+BASE_LINE_WIDTH = 2.2
+HIGHLIGHT_WIDTH = 4.2
+BASE_LINE_COLOR = theme.mix_hex(theme.POSITIVE_DARK, theme.PAPER, 0.22)
+HIGHLIGHT_COLOR = theme.INK
+BASE_LINE_OPACITY = 0.18
+HIGHLIGHT_OPACITY = 0.96
+
+
+def load_profiles() -> pd.DataFrame:
+    """Load daily MSCI World data and derive per-year normalized profiles."""
     df = pd.read_csv(
-        DATA_PATH, sep=",", skiprows=[1, 2], header=0, index_col=0, parse_dates=True
+        DATA_PATH,
+        sep=",",
+        skiprows=[1, 2],
+        header=0,
+        index_col=0,
+        parse_dates=True,
+    ).rename_axis("Date")
+
+    close = df.iloc[:, 0].rename("Value").to_frame()
+    close["Year"] = close.index.year
+    close["Normalized"] = close.groupby("Year")["Value"].transform(
+        lambda series: (series - series.iloc[0]) / series.iloc[0] * 100
     )
-except FileNotFoundError:
-    raise FileNotFoundError(f"Data file not found: {DATA_PATH}")
-
-# Rename index for clarity
-df = df.rename_axis("Date")
-
-# Keep only the first column as 'Value'
-if df.shape[1] > 1:
-    df = df.iloc[:, [0]]
-df.columns = ["Value"]
-
-# --- Data Normalization per Calendar Year -------------------------------
-# Extract year for grouping
-df["Year"] = df.index.year
-
-# Percent change from first trading day of each year
-df["Normalized"] = df.groupby("Year")["Value"].transform(
-    lambda x: (x - x.iloc[0]) / x.iloc[0] * 100
-)
-
-# Log2 fold change for multiplicative comparison
-df["Normalized_log"] = df.groupby("Year")["Value"].transform(
-    lambda x: np.log2(x / x.iloc[0])
-)
-
-# Keep only normalized columns
-df = df[["Normalized", "Normalized_log"]]
+    close["Normalized_log"] = close.groupby("Year")["Value"].transform(
+        lambda series: np.log2(series / series.iloc[0])
+    )
+    return close[["Normalized", "Normalized_log"]]
 
 
-# --- Plotting Function --------------------------------------------------
-def main(df: pd.DataFrame):
-    """
-    Generate an interactive Plotly chart showing yearly return profiles.
-
-    - Additive Change: Percent change from Jan 1 (visible by default)
-    - Multiplicative Change: Log2 fold change (hidden by default)
-    - Slider highlights a single year across both modes.
-    """
-    # Work on a copy and sort by date
-    df = df.copy()
-    df.sort_index(inplace=True)
-
-    years = sorted(df.index.year.unique())
-    n_years = len(years)
-    total_traces = 2 * n_years
-
-    # Y-axis limits for consistency
-    ymin, ymax = -110, 60
+def build_figure(profiles: pd.DataFrame) -> tuple[go.Figure, dict[str, str], str]:
+    """Build the themed yearly-profile figure and hover-persistence script."""
+    profiles = profiles.copy().sort_index()
+    years = sorted(profiles.index.year.unique())
+    total_traces = len(years) * 2
 
     fig = go.Figure()
 
-    # Add trace for each year in both additive & multiplicative modes
-    for mode, col, visible in [
-        ("Additive Change", "Normalized", True),
-        ("Multiplicative Change", "Normalized_log", False),
+    for column, visible, hover_label in [
+        ("Normalized", True, "Cumulative change"),
+        ("Normalized_log", False, "Log2 change"),
     ]:
         for year in years:
-            df_year = df[df.index.year == year]
-            x_vals = df_year.index.dayofyear  # Actual day of year
-            y_vals = df_year[col]
-
+            year_slice = profiles[profiles.index.year == year]
             fig.add_trace(
                 go.Scatter(
-                    x=x_vals,
-                    y=y_vals,
+                    x=year_slice.index.dayofyear,
+                    y=year_slice[column].round(2),
                     mode="lines",
-                    line=dict(color=LINE_COLOR, width=LINE_WIDTH),
-                    opacity=LINE_OPACITY,
+                    line=dict(color=BASE_LINE_COLOR, width=BASE_LINE_WIDTH),
+                    opacity=BASE_LINE_OPACITY,
                     visible=visible,
                     name=str(year),
-                    text=[
-                        f"Date: {d.strftime('%d %B %Y')}<br>"
-                        + (
-                            f"{mode}: {v:.2f}%"
-                            if mode == "Additive Change"
-                            else f"{mode}: {v:.2f}"
-                        )
-                        for d, v in zip(df_year.index, y_vals)
-                    ],
-                    hoverinfo="text",
+                    customdata=year_slice.index.strftime("%Y-%m-%d"),
+                    hovertemplate=(
+                        "<b>%{fullData.name}</b><br>"
+                        "%{customdata}<br>"
+                        f"{hover_label} "
+                        + ("%{y:+.2f}%" if column == "Normalized" else "%{y:+.2f}")
+                        + "<extra></extra>"
+                    ),
                     showlegend=False,
                 )
             )
 
-    # --- Toggle Buttons ----------------------------------------------------
-    buttons = [
-        dict(
-            label="Additive Change (Linear Scale)",
-            method="update",
-            args=[
-                {"visible": [True] * n_years + [False] * n_years},
-                {
-                    "yaxis": {
-                        "title": {"text": "Percent Change from January 1"},
-                        "ticksuffix": "%",
-                        "range": [ymin, ymax],
-                        "fixedrange": True,
-                        "showgrid": True,
-                        "gridcolor": "lightgrey",
-                        "zeroline": True,
-                        "zerolinecolor": "black",
-                        "showline": True,
-                        "linecolor": "black",
-                        "linewidth": 0.5,
-                    }
-                },
-            ],
+    linear_yaxis = dict(
+        title=dict(
+            text="Cumulative change from Jan 1",
+            font=dict(size=12, color=theme.MUTED),
         ),
-        dict(
-            label="Multiplicative Change (Log₂ Scale)",
-            method="update",
-            args=[
-                {"visible": [False] * n_years + [True] * n_years},
-                {
-                    "yaxis": {
-                        "title": {"text": "Log₂ Fold Change from January 1"},
-                        "range": [ymin / 100, ymax / 100],
-                        "fixedrange": True,
-                        "showgrid": True,
-                        "gridcolor": "lightgrey",
-                        "zeroline": True,
-                        "zerolinecolor": "black",
-                        "showline": True,
-                        "linecolor": "black",
-                        "linewidth": 0.5,
-                    }
-                },
-            ],
+        hoverformat=".2f",
+        ticksuffix="%",
+        range=[-110, 60],
+        fixedrange=True,
+        showgrid=True,
+        gridcolor=theme.GRID_SOFT,
+        zeroline=True,
+        zerolinecolor=theme.GRID,
+        showline=False,
+        tickfont=dict(size=11, color="#4C5660"),
+    )
+    log_yaxis = dict(
+        title=dict(
+            text="Log2 change from Jan 1",
+            font=dict(size=12, color=theme.MUTED),
         ),
-    ]
+        hoverformat=".2f",
+        range=[-1.1, 0.6],
+        fixedrange=True,
+        showgrid=True,
+        gridcolor=theme.GRID_SOFT,
+        zeroline=True,
+        zerolinecolor=theme.GRID,
+        showline=False,
+        tickfont=dict(size=11, color="#4C5660"),
+    )
 
-    # --- Slider Steps to Highlight Year -----------------------------------
     steps = []
-    for i, year in enumerate(years):
-        highlight_idxs = [i, i + n_years]
-        widths = [
-            HIGHLIGHT_WIDTH if j in highlight_idxs else LINE_WIDTH
-            for j in range(total_traces)
-        ]
-        colors = [
-            HIGHLIGHT_COLOR if j in highlight_idxs else LINE_COLOR
-            for j in range(total_traces)
-        ]
-        opacities = [
-            HIGHLIGHT_OPACITY if j in highlight_idxs else LINE_OPACITY
-            for j in range(total_traces)
-        ]
-
+    for year_index, year in enumerate(years):
+        highlight_indices = [year_index, year_index + len(years)]
         steps.append(
             dict(
                 method="restyle",
                 label=str(year),
                 args=[
-                    {"line.width": widths, "line.color": colors, "opacity": opacities},
+                    {
+                        "line.width": [
+                            HIGHLIGHT_WIDTH
+                            if index in highlight_indices
+                            else BASE_LINE_WIDTH
+                            for index in range(total_traces)
+                        ],
+                        "line.color": [
+                            HIGHLIGHT_COLOR
+                            if index in highlight_indices
+                            else BASE_LINE_COLOR
+                            for index in range(total_traces)
+                        ],
+                        "opacity": [
+                            HIGHLIGHT_OPACITY
+                            if index in highlight_indices
+                            else BASE_LINE_OPACITY
+                            for index in range(total_traces)
+                        ],
+                    },
                     list(range(total_traces)),
                 ],
             )
         )
 
-    slider = dict(
-        active=0,
-        currentvalue={"prefix": "Highlighted year: "},
-        pad={"t": 50},
-        steps=steps,
-    )
-
-    # --- Final Layout & Interactivity -------------------------------------
     fig.update_layout(
         updatemenus=[
             dict(
                 type="buttons",
                 showactive=True,
-                buttons=buttons,
                 direction="right",
-                pad={"r": 10, "b": 10},
+                buttons=[
+                    dict(
+                        label="Linear View",
+                        method="update",
+                        args=[
+                            {"visible": [True] * len(years) + [False] * len(years)},
+                            {"yaxis": linear_yaxis},
+                        ],
+                    ),
+                    dict(
+                        label="Log₂ View",
+                        method="update",
+                        args=[
+                            {"visible": [False] * len(years) + [True] * len(years)},
+                            {"yaxis": log_yaxis},
+                        ],
+                    ),
+                ],
                 x=1,
                 xanchor="right",
-                y=1,
+                y=1.12,
                 yanchor="bottom",
             )
         ],
-        sliders=[slider],
+        sliders=[
+            dict(
+                active=len(years) - 1,
+                currentvalue={"prefix": "Highlighted year: "},
+                steps=steps,
+            )
+        ],
+    )
+
+    fig.add_hline(y=0, line_width=1, line_color=theme.GRID)
+
+    theme.apply_to_figure(
+        fig,
+        margin=dict(l=42, r=22, t=36, b=64),
+        hovermode="closest",
         xaxis=dict(
+            hoverformat=".0f",
             range=[1, 366],
-            tick0=0,
-            dtick=30,
-            ticksuffix=" days",
+            tickmode="array",
+            tickvals=[1, 61, 122, 183, 244, 305, 366],
+            ticktext=["Jan", "Mar", "May", "Jul", "Sep", "Nov", "Dec"],
             fixedrange=True,
-            showline=True,
-            linewidth=0.5,
-            linecolor="black",
-            zeroline=True,
-            zerolinecolor="black",
             showgrid=False,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=11, color="#4C5660"),
         ),
-        yaxis=dict(
-            title="Percent Change from January 1",  # default y-axis label
-            ticksuffix="%",
-            tickformat=".0f%",
-            fixedrange=True,
-            showgrid=True,
-            gridcolor="lightgrey",
-            zeroline=True,
-            zerolinecolor="black",
-            showline=True,
-            linecolor="black",
-            linewidth=0.5,
-            range=[ymin, ymax],
-        ),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        title="MSCI World Daily Yearly Profiles",
+        yaxis=linear_yaxis,
     )
 
-    # Annotation: data source & credits
-    fig.add_annotation(
-        x=1,
-        y=1,
-        xref="paper",
-        yref="paper",
-        text=(
-            "Daily return profiles of the MSCI World Index by calendar year, "
-            "showing both cumulative percent change and log₂ fold change.<br>"
-            "Toggle between linear and log₂ scales with the buttons above, "
-            "and use the slider to highlight a specific year's performance.<br>"
-            "Data: MSCI World Index (^990100-USD-STRD) from Yahoo Finance. "
-            "Author: Alexander Blinn"
-        ),
-        showarrow=False,
-        font=dict(size=8, color="black"),
-        xanchor="right",
-        yanchor="top",
-        align="right",
+    latest_year = years[-1]
+    latest_return = float(
+        profiles[profiles.index.year == latest_year]["Normalized"].iloc[-1]
+    )
+    best_yearly_return = float(
+        profiles.groupby(profiles.index.year)["Normalized"].last().max()
     )
 
-    # Generate HTML and inject custom JS for hover persistence
-    html_str = pio.to_html(fig, full_html=True, include_plotlyjs="cdn", div_id="myPlot")
-    DIV_ID = "myPlot"
+    summary = {
+        "span": f"{years[0]} to {years[-1]}",
+        "years": f"{len(years)} yearly paths",
+        "latest": f"{latest_year} ended {latest_return:+.1f}%",
+        "best": f"Best year closed {best_yearly_return:+.1f}%",
+    }
 
-    hover_js = f"""
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        var plotDiv = document.getElementById('{DIV_ID}');
+    extra_script = f"""
+  <script>
+    window.addEventListener("load", function () {{
+      const chart = document.getElementById("chart");
+      const traceIndices = Array.from({{ length: chart && chart.data ? chart.data.length : 0 }}, function (_, index) {{ return index; }});
+      const yearCount = {len(years)};
+      let hoveredIndex = null;
+      if (!chart || !chart.on || !window.Plotly) return;
 
-        // initial highlight of slider’s default year
-        var slider = plotDiv.layout.sliders[0];
-        var activeIdx = slider.active;
-        var activeYear = slider.steps[activeIdx].label;
-        plotDiv.data.forEach(function(trace, idx) {{
-            if (trace.name === activeYear) {{
-                Plotly.restyle(plotDiv, {{
-                    'line.width': {HIGHLIGHT_WIDTH},
-                    'line.color': '{HIGHLIGHT_COLOR}',
-                    'opacity': {HIGHLIGHT_OPACITY}
-                }}, [idx]);
-            }}
+      const activeYearIndex = function () {{
+        const slider = chart.layout.sliders && chart.layout.sliders[0];
+        return slider && typeof slider.active === "number" ? slider.active : 0;
+      }};
+
+      const syncHighlightState = function () {{
+        const activeIndex = activeYearIndex();
+        const widths = traceIndices.map(function (index) {{
+          return index === activeIndex || index === activeIndex + yearCount || index === hoveredIndex
+            ? {HIGHLIGHT_WIDTH}
+            : {BASE_LINE_WIDTH};
+        }});
+        const colors = traceIndices.map(function (index) {{
+          return index === activeIndex || index === activeIndex + yearCount || index === hoveredIndex
+            ? "{HIGHLIGHT_COLOR}"
+            : "{BASE_LINE_COLOR}";
+        }});
+        const opacities = traceIndices.map(function (index) {{
+          return index === activeIndex || index === activeIndex + yearCount || index === hoveredIndex
+            ? {HIGHLIGHT_OPACITY}
+            : {BASE_LINE_OPACITY};
         }});
 
-        // on hover: always highlight
-        plotDiv.on('plotly_hover', function(eventData) {{
-            var i = eventData.points[0].curveNumber;
-            Plotly.restyle(plotDiv, {{
-                'line.width': {HIGHLIGHT_WIDTH},
-                'line.color': '{HIGHLIGHT_COLOR}',
-                'opacity': {HIGHLIGHT_OPACITY}
-            }}, [i]);
-        }});
+        return Plotly.restyle(
+          chart,
+          {{
+            "line.width": widths,
+            "line.color": colors,
+            "opacity": opacities
+          }},
+          traceIndices
+        );
+      }};
 
-        // on unhover: reset only if not slider-selected
-        plotDiv.on('plotly_unhover', function(eventData) {{
-            var i = eventData.points[0].curveNumber;
-            var slider = plotDiv.layout.sliders[0];
-            var activeYear = slider.steps[slider.active].label;
-            var traceYear = plotDiv.data[i].name;
-            if (traceYear === activeYear) return;  // keep highlighted
-            Plotly.restyle(plotDiv, {{
-                'line.width': {LINE_WIDTH},
-                'line.color': '{LINE_COLOR}',
-                'opacity': {LINE_OPACITY}
-            }}, [i]);
-        }});
+      syncHighlightState();
+      chart.on("plotly_sliderchange", function () {{
+        hoveredIndex = null;
+      }});
+      chart.on("plotly_hover", function (eventData) {{
+        if (!eventData || !eventData.points || !eventData.points.length) return;
+        const nextHoveredIndex = eventData.points[0].curveNumber;
+        if (hoveredIndex === nextHoveredIndex) return;
+        hoveredIndex = nextHoveredIndex;
+        syncHighlightState();
+      }});
+      chart.on("plotly_unhover", function () {{
+        if (hoveredIndex === null) return;
+        hoveredIndex = null;
+        syncHighlightState();
+      }});
     }});
-    </script>
-    """
+  </script>
+"""
 
-    html_out = html_str.replace("</body>", hover_js + "\n</body>")
-    SAVE_HTML_TO.write_text(html_out, encoding="utf-8")
+    return fig, summary, extra_script
 
-    # # Export to HTML
-    # fig.write_html(
-    #     SAVE_HTML_TO,
-    #     config={
-    #         "displayModeBar": True,  # set to False to hide the toolbar completely
-    #         "modeBarButtonsToRemove": ["select2d", "lasso2d"],  # remove selection tools
-    #         "scrollZoom": False,  # disable scroll-to-zoom
-    #         "doubleClick": "reset",  # customize double-click behavior (e.g., reset axes)
-    #         "displaylogo": False,  # hide the Plotly logo
-    #     },
-    # )
+
+def main() -> None:
+    """Render the themed yearly-profile HTML asset."""
+    profiles = load_profiles()
+    fig, summary, extra_script = build_figure(profiles)
+    theme.render_html(
+        fig,
+        SAVE_HTML_TO,
+        eyebrow="MSCI World Index",
+        title="MSCI World Yearly Trends",
+        deck=(
+            "Each line resets to the first trading day of its calendar year. "
+            "This makes seasonality, crisis paths, and late-year recoveries "
+            "comparable across decades without flattening everything into one path."
+        ),
+        kicker="",
+        meta_items=[
+            summary["span"],
+            summary["years"],
+            summary["latest"],
+            summary["best"],
+        ],
+        footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
+        footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
+        extra_script=extra_script,
+    )
 
 
 if __name__ == "__main__":
-    main(df)
+    main()

@@ -1,201 +1,165 @@
 """
-Single Weekly Profile of MSCI World Index
-
-Loads weekly-sampled MSCI World Index data, computes normalized returns,
-and renders an interactive Plotly chart with additive and multiplicative modes.
-Author: Alexander Blinn
+Render the single-line weekly MSCI World profile in the shared editorial theme.
 """
 
-import locale
+from __future__ import annotations
+
 from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+import theme
 
-# --- Locale & Style Settings ---------------------------------------------
-locale.setlocale(locale.LC_TIME, "us_US.UTF-8")  # Ensure US month names
-
-LINE_COLOR = "#000000"  # Default line color
-LINE_WIDTH = 4  # Default line width
-LINE_OPACITY = 1  # Default opacity
-
-# --- File Paths -----------------------------------------------------------
 WORKING_DIR = Path.cwd()
 DATA_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
 SAVE_HTML_TO = WORKING_DIR / "img" / "single.html"
 
-# --- Data Loading & Preparation ------------------------------------------
-try:
-    # Skip first two metadata rows, parse dates, set index
+
+def load_weekly_profile() -> pd.DataFrame:
+    """Load the MSCI World close series and sample it weekly."""
     df = pd.read_csv(
-        DATA_PATH, sep=",", skiprows=[1, 2], header=0, index_col=0, parse_dates=True
-    )
-except FileNotFoundError:
-    raise FileNotFoundError(f"Data file not found: {DATA_PATH}")
+        DATA_PATH,
+        sep=",",
+        skiprows=[1, 2],
+        header=0,
+        index_col=0,
+        parse_dates=True,
+    ).rename_axis("Date")
 
-# Rename index for clarity and select first column only
-df = df.rename_axis("Date")
-if df.shape[1] > 1:
-    df = df.iloc[:, [0]]
-df.columns = ["Value"]
-
-# Resample weekly and take the first value of each week
-df = df.resample("W").first()
-
-# Y-axis limits for consistency
-ymin, ymax = 0, 4400
+    close = df.iloc[:, 0].rename("Value")
+    weekly = close.resample("W").first().dropna().to_frame()
+    return weekly
 
 
-# --- Plotting Function ---------------------------------------------------
-def main(df: pd.DataFrame):
-    """
-    Renders an interactive Plotly chart with two modes:
-      1. Additive Change
-      2. Multiplicative Change (log2 scale)
+def build_figure(profile: pd.DataFrame) -> tuple[go.Figure, dict[str, str]]:
+    """Build the weekly profile figure with linear and log views."""
+    latest_value = float(profile["Value"].iloc[-1])
+    high_value = float(profile["Value"].max())
+    low_value = float(profile["Value"].min())
 
-    Mode toggles via buttons above the chart.
-    """
     fig = go.Figure()
-
-    # Add two traces: additive and multiplicative
-    for mode, col, visible in [
-        ("Additive Change", "Value", True),
-        ("Multiplicative Change", "Value", False),
-    ]:
+    for visible in (True, False):
         fig.add_trace(
             go.Scatter(
-                x=df.index,
-                y=df[col],
+                x=profile.index,
+                y=profile["Value"],
                 mode="lines",
-                line=dict(color=LINE_COLOR, width=LINE_WIDTH),
-                opacity=LINE_OPACITY,
-                visible=visible,
-                name=mode,
-                hoverinfo="text",
+                line=dict(color=theme.POSITIVE_DARK, width=3.5),
+                hovertemplate=("%{x|%Y-%m-%d}<br>Index level %{y:,.2f}<extra></extra>"),
                 showlegend=False,
+                visible=visible,
             )
         )
 
-    # Define buttons for mode switching
-    buttons = [
-        dict(
-            label="Additive Change",
-            method="update",
-            args=[
-                {"visible": [True, False]},
-                {
-                    "yaxis": {
-                        "title": {"text": "Absolute Return in USD"},
-                        "tickprefix": "$",
-                        "showline": True,
-                        "linewidth": 0.5,
-                        "linecolor": "black",
-                        "zeroline": False,
-                        "showgrid": True,
-                        "gridcolor": "lightgrey",
-                        "range": [ymin, ymax],
-                        "fixedrange": True,
-                    }
-                },
-            ],
+    linear_yaxis = dict(
+        title=dict(text="Index level", font=dict(size=12, color=theme.MUTED)),
+        hoverformat=",.2f",
+        range=[low_value * 0.95, high_value * 1.05],
+        fixedrange=True,
+        showgrid=True,
+        gridcolor=theme.GRID_SOFT,
+        zeroline=False,
+        showline=False,
+        tickfont=dict(size=11, color="#4C5660"),
+    )
+    log_yaxis = dict(
+        title=dict(
+            text="Index level (log scale)",
+            font=dict(size=12, color=theme.MUTED),
         ),
-        dict(
-            label="Multiplicative Change",
-            method="update",
-            args=[
-                {"visible": [False, True]},
-                {
-                    "yaxis": {
-                        "title": {"text": "Absolute Return in USD (log₂ scale)"},
-                        "tickprefix": "$",
-                        "type": "log",
-                        "base": 2,
-                        "showline": True,
-                        "linewidth": 0.5,
-                        "linecolor": "black",
-                        "zeroline": False,
-                        "showgrid": True,
-                        "gridcolor": "lightgrey",
-                        "fixedrange": True,
-                        "minor": {"showgrid": True, "dtick": 0.5},
-                    }
-                },
-            ],
-        ),
-    ]
+        type="log",
+        hoverformat=",.2f",
+        fixedrange=True,
+        showgrid=True,
+        gridcolor=theme.GRID_SOFT,
+        zeroline=False,
+        showline=False,
+        tickfont=dict(size=11, color="#4C5660"),
+    )
 
-    # Apply layout with buttons
     fig.update_layout(
         updatemenus=[
             dict(
                 type="buttons",
                 showactive=True,
-                buttons=buttons,
                 direction="right",
-                pad={"r": 10, "b": 10},
+                buttons=[
+                    dict(
+                        label="Linear View",
+                        method="update",
+                        args=[
+                            {"visible": [True, False]},
+                            {"yaxis": linear_yaxis},
+                        ],
+                    ),
+                    dict(
+                        label="Log₂ View",
+                        method="update",
+                        args=[
+                            {"visible": [False, True]},
+                            {"yaxis": log_yaxis},
+                        ],
+                    ),
+                ],
                 x=1,
                 xanchor="right",
-                y=1,
+                y=1.11,
                 yanchor="bottom",
             )
-        ],
+        ]
+    )
+
+    theme.apply_to_figure(
+        fig,
+        margin=dict(l=38, r=20, t=30, b=48),
+        hovermode="x unified",
         xaxis=dict(
-            showline=True,
-            zeroline=False,
+            hoverformat="%Y-%m-%d",
+            fixedrange=True,
             showgrid=False,
-            linewidth=0.5,
-            linecolor="black",
-            fixedrange=True,
-        ),
-        yaxis=dict(
-            title="Absolute Return in USD",
-            tickprefix="$",
-            showline=True,
-            linewidth=0.5,
-            linecolor="black",
             zeroline=False,
-            showgrid=True,
-            gridcolor="lightgrey",
-            range=[ymin, ymax],
-            fixedrange=True,
+            showline=False,
+            tickfont=dict(size=11, color="#4C5660"),
+            tickformat="%Y",
         ),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        title="MSCI World Index: Weekly Profile",
+        yaxis=linear_yaxis,
     )
 
-    # Add annotation with data source and author
-    fig.add_annotation(
-        xref="paper",
-        yref="paper",
-        x=1,
-        y=1,
-        xanchor="right",
-        yanchor="top",
-        text=(
-            "Weekly closing values of the MSCI World Index, sampled weekly.<br>"
-            "Additive trace shows raw index values; Multiplicative uses log₂ transformation. "
-            "Switch modes with the buttons above.<br>"
-            "Data source: Yahoo Finance (^990100-USD-STRD). "
-            "Author: Alexander Blinn"
-        ),
-        showarrow=False,
-        font=dict(size=8, color="black"),
-        align="right",
-    )
+    summary = {
+        "span": (f"{profile.index.min():%Y} to {profile.index.max():%Y}"),
+        "weeks": f"{len(profile)} weekly observations",
+        "latest": f"Latest {latest_value:,.0f}",
+        "high": f"Peak {high_value:,.0f}",
+    }
+    return fig, summary
 
-    # Export to HTML
-    fig.write_html(
+
+def main() -> None:
+    """Render the themed weekly profile HTML asset."""
+    profile = load_weekly_profile()
+    fig, summary = build_figure(profile)
+    theme.render_html(
+        fig,
         SAVE_HTML_TO,
-        config={
-            "displayModeBar": True,  # set to False to hide the toolbar completely
-            "modeBarButtonsToRemove": ["select2d", "lasso2d"],  # remove selection tools
-            "scrollZoom": False,  # disable scroll-to-zoom
-            "doubleClick": "reset",  # customize double-click behavior (e.g., reset axes)
-            "displaylogo": False,  # hide the Plotly logo
-        },
+        eyebrow="MSCI World Index",
+        title="MSCI World Long-Term Trend",
+        deck=(
+            "A stripped-back view of the MSCI World path over time. The same "
+            "series can be read in a standard linear scale or compressed into "
+            "a log view to compare earlier and later decades more evenly. "
+            "Daily closing prices have been averaged over each weekly period."
+        ),
+        kicker="",
+        meta_items=[
+            summary["span"],
+            summary["weeks"],
+            # summary["latest"],
+            # summary["high"],
+        ],
+        footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
+        footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
     )
 
 
 if __name__ == "__main__":
-    main(df)
+    main()

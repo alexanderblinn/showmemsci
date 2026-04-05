@@ -1,203 +1,241 @@
-import locale
+"""
+Render annual MSCI World returns by year in the shared editorial theme.
+"""
+
+from __future__ import annotations
+
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import theme
 
-# set US locale for month names if needed
-locale.setlocale(locale.LC_TIME, "us_US.UTF-8")
-
-# Highlight settings (unused for bars but kept for consistency)
-HIGHLIGHT_WIDTH = 4
-HIGHLIGHT_COLOR = "#000000"
-HIGHLIGHT_OPACITY = 1.0
-
-# Default (standard) settings
-LINE_COLOR = "#000000"
-LINE_WIDTH = 10
-LINE_OPACITY = 0.15
-
-# --- 1) Daten laden ---
 WORKING_DIR = Path.cwd()
-FILE_PATH = Path(WORKING_DIR, "src", "data", "raw", "MSCI_World_daily.csv")
+DATA_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
 SAVE_HTML_TO = WORKING_DIR / "img" / "returns-two.html"
+NOTES_SOURCE_PATH = WORKING_DIR / "src" / "plots" / "plot_returns-one.py"
 
 
-df = pd.read_csv(
-    FILE_PATH, sep=",", skiprows=[1, 2], header=0, index_col=0, parse_dates=True
-)
-df = df.rename_axis("Date")
+def load_year_notes() -> dict[int, str]:
+    """Load the shared year notes from the Returns I chart."""
+    spec = spec_from_file_location("plot_returns_one_notes", NOTES_SOURCE_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load notes from {NOTES_SOURCE_PATH}")
 
-# Jahresendkurse und Renditen
-df_yearly = df.resample("YE").last()
-returns = df_yearly["Close"].pct_change().dropna().to_frame("pct")
-returns["log2"] = np.log2(1 + returns["pct"])
-returns.index = returns.index.year
-returns = returns[returns.index < 2025]
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.YEAR_NOTES
 
-# Farben pro Modus
-colors_pct = ["#124C4C" if v >= 0 else "#581845" for v in returns["pct"]]
-colors_log2 = ["#124C4C" if v >= 0 else "#581845" for v in returns["log2"]]
 
-# Gemeinsame y-Range
-ymin = -0.85
-ymax = 0.60
+YEAR_NOTES = load_year_notes()
 
-# --- 3) Bar-Plot mit Buttons ---
-fig = go.Figure()
 
-# 0) Null-Linie als Shape unter den Bars
-fig.add_shape(
-    dict(
-        type="line",
-        xref="paper",
-        x0=0,
-        x1=1,
-        yref="y",
-        y0=0,
-        y1=0,
-        line=dict(color="black", width=1),
-        layer="below",
-    )
-)
+def load_returns() -> pd.DataFrame:
+    """Load year-end MSCI World returns and their log2 transform."""
+    df = pd.read_csv(
+        DATA_PATH,
+        sep=",",
+        skiprows=[1, 2],
+        header=0,
+        index_col=0,
+        parse_dates=True,
+    ).rename_axis("Date")
 
-# Additive (pct) bars
-fig.add_trace(
-    go.Bar(
-        x=returns.index.astype(str),
-        y=returns["pct"],
-        marker_color=colors_pct,
-        visible=True,
-        name="Additive Change",
-        hovertemplate="Year: %{x}<br>Return: %{y:.2%}<extra></extra>",
-    )
-)
-# Multiplicative (log₂) bars
-fig.add_trace(
-    go.Bar(
-        x=returns.index.astype(str),
-        y=returns["log2"],
-        marker_color=colors_log2,
-        visible=False,
-        name="Multiplicative Change",
-        hovertemplate="Year: %{x}<br>Log₂ Return: %{y:.2f}<extra></extra>",
-    )
-)
+    yearly = df.resample("YE").last()
+    returns = yearly["Close"].pct_change().dropna().to_frame("pct")
+    returns["log2"] = np.log2(1 + returns["pct"])
+    returns.index = returns.index.year
+    return returns[returns.index < 2026]
 
-# Buttons
-buttons = [
-    dict(
-        label="Additive Change (Linear Scale)",
-        method="update",
-        args=[
-            {"visible": [True, False]},
-            {
-                "yaxis": {
-                    "title": {"text": "Annual Return (%)"},
-                    "tickformat": ".0%",
-                    "showline": True,
-                    "linewidth": 0.5,
-                    "linecolor": "black",
-                    "zeroline": False,
-                    "showgrid": True,
-                    "gridcolor": "lightgrey",
-                    "range": [ymin, ymax],
-                    "fixedrange": True,
-                }
-            },
-        ],
-    ),
-    dict(
-        label="Multiplicative Change (Log₂ Scale)",
-        method="update",
-        args=[
-            {"visible": [False, True]},
-            {
-                "yaxis": {
-                    "title": {"text": "Annual Log₂ Return"},
-                    "tickformat": ".2f",
-                    "showline": True,
-                    "linewidth": 0.5,
-                    "linecolor": "black",
-                    "zeroline": False,
-                    "showgrid": True,
-                    "gridcolor": "lightgrey",
-                    "range": [ymin, ymax],
-                    "fixedrange": True,
-                }
-            },
-        ],
-    ),
-]
 
-fig.update_layout(
-    title="Annual Returns of the MSCI World Index",
-    updatemenus=[
-        dict(
-            type="buttons",
-            direction="right",
-            showactive=True,
-            buttons=buttons,
-            pad=dict(r=10, b=10),
-            x=1,
-            xanchor="right",
-            y=1,
-            yanchor="bottom",
+def diverging_bar_colors(values: pd.Series) -> list[str]:
+    """Map values to a muted negative-neutral-positive editorial gradient."""
+    max_abs = max(abs(float(values.min())), abs(float(values.max())), 1e-9)
+    colors: list[str] = []
+
+    for value in values:
+        intensity = min(abs(float(value)) / max_abs, 1.0)
+        if value >= 0:
+            colors.append(
+                theme.mix_hex(
+                    theme.NEUTRAL, theme.POSITIVE_DARK, 0.18 + 0.82 * intensity
+                )
+            )
+        else:
+            colors.append(
+                theme.mix_hex(
+                    theme.NEUTRAL, theme.NEGATIVE_SOFT, 0.16 + 0.78 * intensity
+                )
+            )
+
+    return colors
+
+
+def build_figure(returns: pd.DataFrame) -> tuple[go.Figure, dict[str, str]]:
+    """Build the yearly returns chart with percent and log2 views."""
+    colors_pct = diverging_bar_colors(returns["pct"])
+    colors_log2 = diverging_bar_colors(returns["log2"])
+
+    pct_min = float(returns["pct"].min())
+    pct_max = float(returns["pct"].max())
+    log_min = float(returns["log2"].min())
+    log_max = float(returns["log2"].max())
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Bar(
+            x=returns.index.astype(str),
+            y=returns["pct"],
+            marker=dict(
+                color=colors_pct, line=dict(color="rgba(41, 47, 54, 0.16)", width=1)
+            ),
+            customdata=[[YEAR_NOTES.get(int(year), "-")] for year in returns.index],
+            hovertemplate=(
+                "<b>%{x}</b><br>"
+                "Annual return %{y:+.2%}<br>"
+                "%{customdata[0]}<extra></extra>"
+            ),
+            visible=True,
+            showlegend=False,
         )
-    ],
-    xaxis=dict(
-        title="Year",
-        tickangle=-90,
-        tickmode="array",
-        showline=True,
-        linewidth=0.5,
-        linecolor="black",
-        zeroline=False,
-        fixedrange=True,
-    ),
-    yaxis=dict(
-        title="Annual Return (%)",
+    )
+    fig.add_trace(
+        go.Bar(
+            x=returns.index.astype(str),
+            y=returns["log2"],
+            marker=dict(
+                color=colors_log2, line=dict(color="rgba(41, 47, 54, 0.16)", width=1)
+            ),
+            customdata=[[YEAR_NOTES.get(int(year), "-")] for year in returns.index],
+            hovertemplate=(
+                "<b>%{x}</b><br>"
+                "Log2 return %{y:+.2f}<br>"
+                "%{customdata[0]}<extra></extra>"
+            ),
+            visible=False,
+            showlegend=False,
+        )
+    )
+
+    percent_yaxis = dict(
+        title=dict(text="Annual return", font=dict(size=12, color=theme.MUTED)),
+        hoverformat=".2%",
         tickformat=".0%",
-        showline=True,
-        linewidth=0.5,
-        linecolor="black",
-        zeroline=False,
-        showgrid=True,
-        gridcolor="lightgrey",
-        range=[ymin, ymax],
+        range=[pct_min - 0.06, pct_max + 0.06],
         fixedrange=True,
-    ),
-    plot_bgcolor="rgba(0,0,0,0)",
-    paper_bgcolor="rgba(0,0,0,0)",
-)
+        showgrid=True,
+        gridcolor=theme.GRID_SOFT,
+        zeroline=True,
+        zerolinecolor=theme.GRID,
+        showline=False,
+        tickfont=dict(size=11, color="#4C5660"),
+    )
+    log_yaxis = dict(
+        title=dict(text="Annual log2 return", font=dict(size=12, color=theme.MUTED)),
+        hoverformat=".2f",
+        tickformat=".2f",
+        range=[log_min - 0.08, log_max + 0.08],
+        fixedrange=True,
+        showgrid=True,
+        gridcolor=theme.GRID_SOFT,
+        zeroline=True,
+        zerolinecolor=theme.GRID,
+        showline=False,
+        tickfont=dict(size=11, color="#4C5660"),
+    )
 
-# Annotation (wie zuvor)
-fig.add_annotation(
-    x=1,
-    y=1,
-    xref="paper",
-    yref="paper",
-    text=(
-        "Annual returns of the MSCI World Index per calendar year.<br>"
-        "Data source: MSCI World Index via Yahoo Finance (Ticker: ^990100-USD-STRD)<br>"
-        "Visualization by Alexander Blinn"
-    ),
-    showarrow=False,
-    font=dict(size=8, color="black"),
-    xanchor="right",
-    yanchor="top",
-    align="right",
-)
+    fig.update_layout(
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                showactive=True,
+                buttons=[
+                    dict(
+                        label="Linear View",
+                        method="update",
+                        args=[
+                            {"visible": [True, False]},
+                            {"yaxis": percent_yaxis},
+                        ],
+                    ),
+                    dict(
+                        label="Log₂ View",
+                        method="update",
+                        args=[
+                            {"visible": [False, True]},
+                            {"yaxis": log_yaxis},
+                        ],
+                    ),
+                ],
+                x=1,
+                xanchor="right",
+                y=1.12,
+                yanchor="bottom",
+            )
+        ]
+    )
 
-# Export to HTML
-fig.write_html(
-    SAVE_HTML_TO,
-    config={
-        "displayModeBar": True,  # set to False to hide the toolbar completely
-        "modeBarButtonsToRemove": ["select2d", "lasso2d"],  # remove selection tools
-        "scrollZoom": False,  # disable scroll-to-zoom
-        "doubleClick": "reset",  # customize double-click behavior (e.g., reset axes)
-        "displaylogo": False,  # hide the Plotly logo
-    },
-)
+    theme.apply_to_figure(
+        fig,
+        margin=dict(l=42, r=24, t=30, b=64),
+        bargap=0.16,
+        xaxis=dict(
+            title=dict(text="Calendar year", font=dict(size=12, color=theme.MUTED)),
+            hoverformat=".0f",
+            tickmode="array",
+            tickvals=returns.index.astype(str)[::4],
+            ticktext=returns.index.astype(str)[::4],
+            tickangle=0,
+            fixedrange=True,
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=11, color="#4C5660"),
+        ),
+        yaxis=percent_yaxis,
+    )
+
+    positive_years = int((returns["pct"] >= 0).sum())
+    negative_years = int((returns["pct"] < 0).sum())
+    best_year = int(returns["pct"].idxmax())
+    worst_year = int(returns["pct"].idxmin())
+    summary = {
+        "years": f"{len(returns)} yearly bars",
+        "split": f"{positive_years} positive / {negative_years} negative",
+        "best": f"Best {best_year}: {returns.loc[best_year, 'pct']:+.1%}",
+        "worst": f"Worst {worst_year}: {returns.loc[worst_year, 'pct']:+.1%}",
+    }
+    return fig, summary
+
+
+def main() -> None:
+    """Render the themed Returns II chart."""
+    returns = load_returns()
+    fig, summary = build_figure(returns)
+    theme.render_html(
+        fig,
+        SAVE_HTML_TO,
+        eyebrow="MSCI World Index",
+        title="Annual Returns by Year",
+        deck=(
+            "The annual return history is shown one year at a time instead. "
+            "This view makes the sequence of crises, rebounds, and "
+            "clusters of positive years easier to read across the full timeline."
+        ),
+        kicker="",
+        meta_items=[
+            summary["years"],
+            summary["split"],
+            summary["best"],
+            summary["worst"],
+        ],
+        footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
+        footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
+    )
+
+
+if __name__ == "__main__":
+    main()

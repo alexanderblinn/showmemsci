@@ -1,11 +1,58 @@
+"""Stacked bars represent calendar years grouped into annual-return intervals."""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import theme
 
-# %%
-MSCI_WORLD_CONTEXT = {
+WORKING_DIR = Path.cwd()
+DATA_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
+SAVE_HTML_TO = WORKING_DIR / "img" / "returns-one.html"
+
+INTERVAL_BINS = [
+    # -np.inf,
+    -0.5,
+    -0.4,
+    -0.3,
+    -0.2,
+    -0.1,
+    0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    # 0.5,
+    # np.inf,
+]
+
+NEUTRAL_ZONE = (-0.1, 0.1)
+
+ZONE_STYLES = {
+    "loss": {
+        "label": "Loss Years",
+        "fill": "rgba(92, 70, 80, 0.06)",
+        "line": "rgba(31, 35, 42, 0.10)",
+        "text": "rgba(61,69,77,0.66)",
+    },
+    "neutral": {
+        "label": "Near Flat",
+        "fill": "rgba(164, 143, 109, 0.08)",
+        "line": "rgba(31, 35, 42, 0.10)",
+        "text": "rgba(61,69,77,0.66)",
+    },
+    "gain": {
+        "label": "Strong Gains",
+        "fill": "rgba(93, 122, 129, 0.07)",
+        "line": "rgba(31, 35, 42, 0.10)",
+        "text": "rgba(61,69,77,0.66)",
+    },
+}
+
+YEAR_NOTES = {
     1970: "Entering the year in recession after the late‑'60s slowdown, leading to a weak stock market",
     1971: "Aggressive monetary easing under President Nixon fuels a strong global rebound",
     1972: "Economic boom peaks – low unemployment and surging earnings drive exuberant gains",
@@ -61,159 +108,271 @@ MSCI_WORLD_CONTEXT = {
     2022: "Inflation surge, aggressive hikes, and Ukraine war spark steep downturn",
     2023: "Easing inflation and AI‑led tech boom drive strong rebound despite high rates",
     2024: "Global easing cycle begins; AI mega‑caps propel gains as rate cuts offset election risks",
+    2025: "Strong gains fueled by solid earnings, cooling inflation, and persistent AI‑driven momentum",
 }
 
-# %%
-# --- 1) Daten laden und vorbereiten ---
-WORKING_DIR = Path.cwd()
-FILE_PATH = Path(WORKING_DIR, "src", "data", "raw", "MSCI_World_daily.csv")
-SAVE_HTML_TO = WORKING_DIR / "img" / "returns-one.html"
+
+def load_returns() -> pd.DataFrame:
+    """Load year-end MSCI World returns."""
+    df = pd.read_csv(
+        DATA_PATH,
+        sep=",",
+        skiprows=[1, 2],
+        header=0,
+        index_col=0,
+        parse_dates=True,
+    ).rename_axis("Date")
+
+    yearly = df.resample("YE").last()
+    returns = yearly["Close"].pct_change().dropna().to_frame("Return")
+    returns.index = returns.index.year
+    return returns[returns.index < 2026]
 
 
-df = pd.read_csv(
-    FILE_PATH, sep=",", skiprows=[1, 2], header=0, index_col=0, parse_dates=True
-)
-df = df.rename_axis("Date")
+def interval_label(interval: pd.Interval) -> str:
+    """Format interval labels for the x-axis."""
+    if np.isneginf(interval.left):
+        return f"<br>{interval.right:.0%}"
+    if np.isposinf(interval.right):
+        return f">=<br>{interval.left:.0%}"
+    return f"{interval.left:.0%}<br>to {interval.right:.0%}"
 
-# Jahresendkurse und Renditen
-last = df.resample("YE").last()
-returns = last["Close"].pct_change().dropna().to_frame("Return")
-returns.index = returns.index.year
-returns = returns[returns.index < 2025]
 
-# Intervalle definieren und zuordnen
-bins = [-np.inf, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, np.inf]
-returns["Interval"] = pd.cut(returns["Return"], bins=bins, right=False)
+def interval_hover_label(interval: pd.Interval) -> str:
+    """Format interval labels for the hover card."""
+    if np.isneginf(interval.left):
+        return f"Below {interval.right:.0%}"
+    if np.isposinf(interval.right):
+        return f"{interval.left:.0%} and above"
+    return f"{interval.left:.0%} to {interval.right:.0%}"
 
-# Dict: Interval → Liste von (Jahr, Return)
-return_dict = {
-    iv: list(
-        zip(
-            returns[returns["Interval"] == iv].index,
-            returns.loc[returns["Interval"] == iv, "Return"],
-        )
+
+def classify_zone(interval: pd.Interval) -> str:
+    """Assign an interval to loss, neutral, or gain territory."""
+    neutral_left, neutral_right = NEUTRAL_ZONE
+    overlaps_neutral = interval.right > neutral_left and interval.left < neutral_right
+    if overlaps_neutral:
+        return "neutral"
+    if interval.right <= neutral_left:
+        return "loss"
+    return "gain"
+
+
+def zone_segments(intervals: list[pd.Interval]) -> list[tuple[str, int, int]]:
+    """Collapse contiguous intervals into visual background segments."""
+    if not intervals:
+        return []
+
+    zones = [classify_zone(interval) for interval in intervals]
+    segments: list[tuple[str, int, int]] = []
+    start = 0
+    current = zones[0]
+
+    for index, zone in enumerate(zones[1:], start=1):
+        if zone != current:
+            segments.append((current, start, index - 1))
+            start = index
+            current = zone
+
+    segments.append((current, start, len(zones) - 1))
+    return segments
+
+
+def build_figure(returns: pd.DataFrame) -> tuple[go.Figure, dict[str, str]]:
+    """Build the editorial chart."""
+    returns = returns.copy()
+    returns["Interval"] = pd.cut(returns["Return"], bins=INTERVAL_BINS, right=False)
+
+    intervals = list(returns["Interval"].cat.categories)
+    visible_returns = returns[returns["Interval"].notna()].copy()
+    if visible_returns.empty:
+        raise ValueError("INTERVAL_BINS exclude all return observations.")
+
+    palette = theme.sample_palette(theme.INTERVAL_COLORS, len(intervals))
+    band_counts = (
+        visible_returns.groupby("Interval", observed=False)
+        .size()
+        .reindex(intervals, fill_value=0)
     )
-    for iv in returns["Interval"].cat.categories
-}
 
-# --- 2) Farbenliste und assert ---
-intervals = list(return_dict.keys())
+    fig = go.Figure()
+    stacked_heights = {interval: 0 for interval in intervals}
 
-color_list = [
-    "#581845",  # < -0.5
-    "#581845",  # -0.5 bis -0.4
-    "#581845",  # -0.4 bis -0.3
-    "#900C3F",  # -0.3 bis -0.2
-    "#CD5C5C",  # -0.2 bis -0.1
-    "#E9967A",  # -0.1 bis 0
-    "#124C4C",  # 0 bis 0.1
-    "#8ACBB7",  # 0.1 bis 0.2
-    "#0C888A",  # 0.2 bis 0.3
-    "#124C4C",  # 0.3 bis 0.4
-    "#186C6C",  # 0.4 bis 0.5
-    "#186C6C",  # > 0.5
-]
-# Prüfen, dass wir genau so viele Farben wie Intervalle haben
-assert len(color_list) == len(intervals), (
-    f"Anzahl Farben ({len(color_list)}) ≠ Anzahl Intervalle ({len(intervals)})"
-)
+    for band_index, interval in enumerate(intervals):
+        band_df = visible_returns[visible_returns["Interval"] == interval].sort_index()
+        base_color = palette[band_index]
+        block_count = len(band_df)
 
-# --- 3) Mapping via Schleife ---
-COLORS = {}
-for iv, col in zip(intervals, color_list):
-    COLORS[iv] = col
+        for stack_index, (year, row) in enumerate(band_df.iterrows()):
+            tint = 0.04 + (0.12 * stack_index / max(block_count - 1, 1))
+            tile_color = theme.mix_hex(base_color, "#F6F2E9", tint)
+            note = YEAR_NOTES.get(year, "-")
 
-# --- 4) Plotly-Figur aufbauen mit dem neuen COLORS-Mapping ---
-fig = go.Figure()
-base_tracker = {iv: 0 for iv in intervals}
-
-for iv, entries in return_dict.items():
-    for year, ret in entries:
-        fig.add_trace(
-            go.Bar(
-                x=[str(iv)],
-                y=[1],
-                base=[base_tracker[iv]],
-                text=[f"{year}<br><b>{ret:.1%}</b>"],
-                hoverinfo="text",
-                hovertext=MSCI_WORLD_CONTEXT.get(year, ""),
-                marker=dict(
-                    color=COLORS[iv],
-                    line=dict(color="white", width=2),
-                ),
-                marker_color=COLORS[iv],
-                showlegend=False,
-                # offset=0,
-                textposition="inside",
-                insidetextanchor="middle",  # Center text vertically
+            fig.add_trace(
+                go.Bar(
+                    x=[band_index],
+                    y=[1],
+                    base=[stacked_heights[interval]],
+                    width=0.78,
+                    marker=dict(
+                        color=tile_color,
+                        line=dict(color="rgba(41, 47, 54, 0.24)", width=1),
+                    ),
+                    text=[f"<b>{year}</b><br>{row['Return']:+.0%}"],
+                    textposition="inside",
+                    textangle=0,
+                    insidetextanchor="middle",
+                    textfont=dict(size=10, color="#F8F5EE"),
+                    customdata=[
+                        [
+                            interval_hover_label(interval),
+                            int(year),
+                            float(row["Return"]),
+                            note,
+                        ]
+                    ],
+                    hovertemplate=(
+                        "<b>%{customdata[1]}</b><br>"
+                        # "Return band: %{customdata[0]}<br>"
+                        "Annual return: %{customdata[2]:+.2%}<br>"
+                        "%{customdata[3]}<extra></extra>"
+                    ),
+                    showlegend=False,
+                )
             )
+            stacked_heights[interval] += 1
+
+    max_count = int(band_counts.max())
+    y_max = max(max_count + 1.6, 3)
+
+    segments = zone_segments(intervals)
+    for zone_name, start_idx, end_idx in segments:
+        style = ZONE_STYLES[zone_name]
+        fig.add_vrect(
+            x0=start_idx - 0.5,
+            x1=end_idx + 0.5,
+            fillcolor=style["fill"],
+            line_width=0,
+            layer="below",
         )
-        base_tracker[iv] += 1
+        fig.add_annotation(
+            x=(start_idx + end_idx) / 2,
+            y=y_max - 0.24,
+            text=style["label"],
+            showarrow=False,
+            font=dict(
+                size=12,
+                color=style["text"],
+                family="Aptos, Segoe UI, sans-serif",
+            ),
+        )
 
-# Create better x labels for intervals
-interval_labels = [
-    f"{iv.left:.0%} to {iv.right:.0%}"
-    if np.isfinite(iv.left) and np.isfinite(iv.right)
-    else (f"< {iv.right:.0%}" if np.isneginf(iv.left) else f">= {iv.left:.0%}")
-    for iv in intervals
-]
+    for _, start_idx, _ in segments[1:]:
+        fig.add_vline(
+            x=start_idx - 0.5,
+            line_width=1,
+            line_color="rgba(31, 35, 42, 0.10)",
+        )
 
-fig.update_layout(
-    barmode="stack",
-    yaxis=dict(
-        showticklabels=False,
-        fixedrange=True,
-        showgrid=False,
-    ),
-    xaxis=dict(
-        showline=True,
-        linewidth=2,
-        linecolor="black",
-        layer="above traces",
-        tickangle=0,
-        tickmode="array",
-        tickvals=[str(iv) for iv in intervals],
-        ticktext=interval_labels,
-        fixedrange=True,
-        showgrid=False,
-    ),
-    # hovermode="closest",
-    plot_bgcolor="rgba(0,0,0,0)",
-    paper_bgcolor="rgba(0,0,0,0)",
-    dragmode=False,
-    title="Annual Returns of the MSCI World Index by Return Interval",
-)
+    for band_index, count in enumerate(band_counts.tolist()):
+        if count == 0:
+            continue
+        fig.add_annotation(
+            x=band_index,
+            y=count + 0.52,
+            text=f"{count} yrs",
+            showarrow=False,
+            font=dict(
+                size=10,
+                color="#3D454D",
+                family="Aptos, Segoe UI, sans-serif",
+            ),
+            bgcolor="rgba(248,245,238,0.92)",
+            bordercolor="rgba(61,69,77,0.14)",
+            borderwidth=1,
+            borderpad=4,
+        )
 
-fig.add_annotation(
-    x=0,
-    y=1,
-    xref="paper",
-    yref="paper",
-    text="Annual return of investments in the MSCI World Index,<br>"
-    "categorized by calendar year and grouped into return intervals.<br>"
-    "Returns are calculated as the percentage change between<br>"
-    "the closing values of the final trading days of consecutive years.<br>"
-    "Data source: MSCI World Index via Yahoo Finance (Ticker: ^990100-USD-STRD)<br>"
-    "Visualization by Alexander Blinn",
-    showarrow=False,
-    font=dict(size=12, color="black"),
-    xanchor="left",
-    yanchor="top",
-    align="left",
-    bordercolor="black",
-    borderwidth=1,
-    borderpad=4,
-    bgcolor="white",
-    opacity=0.8,
-)
+    theme.apply_to_figure(
+        fig,
+        barmode="stack",
+        bargap=0.18,
+        margin=dict(l=28, r=24, t=22, b=52),
+        hovermode="closest",
+        uniformtext=dict(minsize=9, mode="show"),
+        xaxis=dict(
+            tickmode="array",
+            tickvals=list(range(len(intervals))),
+            ticktext=[interval_label(interval) for interval in intervals],
+            range=[-0.5, len(intervals) - 0.5],
+            tickfont=dict(size=11, color="#4C5660"),
+            fixedrange=True,
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+        ),
+        yaxis=dict(
+            range=[0, y_max],
+            fixedrange=True,
+            showgrid=False,
+            zeroline=False,
+            showticklabels=False,
+        ),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        dragmode=False,
+    )
 
-fig.write_html(
-    SAVE_HTML_TO,
-    config={
-        "displayModeBar": True,  # set to False to hide the toolbar completely
-        "modeBarButtonsToRemove": ["select2d", "lasso2d"],  # remove selection tools
-        "scrollZoom": False,  # disable scroll-to-zoom
-        "doubleClick": "reset",  # customize double-click behavior (e.g., reset axes)
-        "displaylogo": False,  # hide the Plotly logo
-    },
-)
+    hidden_years = int(returns["Interval"].isna().sum())
+    positive_years = int((visible_returns["Return"] >= 0).sum())
+    negative_years = int((visible_returns["Return"] < 0).sum())
+    mean_return = float(visible_returns["Return"].mean())
+    median_return = float(visible_returns["Return"].median())
+    best_year = int(visible_returns["Return"].idxmax())
+    best_return = float(visible_returns.loc[best_year, "Return"])
+
+    summary = {
+        "years": (
+            f"{len(visible_returns)} shown / {len(returns)} total"
+            if hidden_years
+            else f"{len(visible_returns)} yearly blocks"
+        ),
+        "bands": f"{len(intervals)} interval bands",
+        "split": f"{positive_years} positive / {negative_years} negative",
+        "median": f"Median year {median_return:+.1%}",
+        "mean": f"Mean year {mean_return:+.1%}",
+        "best": f"Best {best_year}: {best_return:+.1%}",
+    }
+    return fig, summary
+
+
+def main() -> None:
+    """Render the editorial chart as a standalone HTML asset."""
+    returns = load_returns()
+    fig, summary = build_figure(returns)
+    theme.render_html(
+        fig,
+        SAVE_HTML_TO,
+        eyebrow="MSCI World Index",
+        title="MSCI World Return Bands",
+        deck=(
+            "Each block represents a specific year, showing its annual return "
+            "alongwith a brief contextual description. "
+            "The years are grouped into bands, each spanning a width of 10%."
+        ),
+        kicker="",
+        meta_items=[
+            summary["years"],
+            # summary["bands"],
+            summary["split"],
+            summary["median"],
+            summary["mean"],
+            summary["best"],
+        ],
+        footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
+        footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
+    )
+
+
+if __name__ == "__main__":
+    main()

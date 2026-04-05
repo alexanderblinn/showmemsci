@@ -108,6 +108,13 @@
       text-transform: uppercase;
     }
 
+    .header__actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
     .nav a {
       color: var(--muted);
       text-decoration: none;
@@ -132,7 +139,7 @@
     .container {
       max-width: var(--maxw);
       margin: 0 auto;
-      padding: 118px 20px 84px;
+      padding: 118px 20px 40px;
       position: relative;
       z-index: 1;
     }
@@ -274,7 +281,7 @@
 
     .footer {
       max-width: var(--maxw);
-      margin: 40px auto 80px;
+      margin: 24px auto 32px;
       padding: 0 20px;
       color: var(--muted);
       font: 600 12px/1.4 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
@@ -292,6 +299,59 @@
       border-bottom: 1px solid rgba(35, 48, 59, 0.22);
     }
 
+    .footer__links {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .support-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-strong);
+      color: var(--ink);
+      font: 600 12px/1.2 system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+      letter-spacing: 0.02em;
+      text-transform: none;
+      transition: border-color 160ms ease, background 160ms ease, transform 80ms ease;
+    }
+
+    .support-link:hover,
+    .support-link:focus-visible {
+      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.76);
+      outline: none;
+    }
+
+    .support-link:active {
+      transform: translateY(1px);
+    }
+
+    .support-link img {
+      width: 18px;
+      height: 18px;
+      display: block;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 760px) {
+      .footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .footer__links {
+        justify-content: flex-start;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       * { scroll-behavior: auto !important; transition: none !important; }
     }
@@ -304,14 +364,26 @@
         <h2 class="brand__title">ShowMeMSCI.com</h2>
       </div>
 
-      <nav class="nav" aria-label="Sections">
-        <a href="#g1">Return Bands</a>
-        <a href="#g2">Weekly Profile</a>
-        <a href="#g3">Yearly Profiles</a>
-        <a href="#g4">Long-Horizon Return Envelope</a>
-        <a href="#g5">Annual Returns</a>
-        <a href="#g6">Return Triangle</a>
-      </nav>
+      <div class="header__actions">
+        <nav class="nav" aria-label="Sections">
+          <a href="#g1">Return Bands</a>
+          <a href="#g2">Long-Term Trend</a>
+          <a href="#g3">Yearly Trends</a>
+          <a href="#g4">Long-Horizon Return Envelope</a>
+          <a href="#g5">Annual Returns</a>
+          <a href="#g6">Return Triangle</a>
+        </nav>
+        <a
+          class="support-link"
+          href="https://buymeacoffee.com/alexander.blinn"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Support ShowMeMSCI on Buy Me a Coffee"
+          aria-label="Support ShowMeMSCI on Buy Me a Coffee">
+          <img src="img/buymeacoffee-icon.png" alt="" width="18" height="18" />
+          <span>Buy me a coffee</span>
+        </a>
+      </div>
     </div>
   </header>
 
@@ -319,7 +391,7 @@
     <section class="hero" aria-describedby="intro">
       <p class="eyebrow">Global equities across cycles</p>
       <h1>MSCI World Index</h1>
-      <p id="intro">Six complementary views on the MSCI World record, from weekly price behavior to annual dispersion and the long-run effect of time in the market.</p>
+      <p id="intro">Six complementary views on the MSCI World record, from daily price behavior to annual dispersion and the long-run effect of time in the market.</p>
     </section>
 
     <div class="divider" aria-hidden="true"></div>
@@ -346,7 +418,7 @@
 
       <article id="g2" class="card">
         <header class="card__head">
-          <h3 class="card__title">Weekly Profile</h3>
+          <h3 class="card__title">Long-Term Trend</h3>
           <div class="card__actions">
             <button class="btn" onclick="document.getElementById('frame2').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
             <button class="btn" onclick="fullscreen(document.getElementById('frame2'))">Fullscreen</button>
@@ -359,13 +431,13 @@
           src="img/single.html"
           loading="lazy"
           referrerpolicy="no-referrer"
-          aria-label="MSCI World diagram - Weekly Profile">
+          aria-label="MSCI World diagram - Long-Term Trend">
         </iframe>
       </article>
 
       <article id="g3" class="card">
         <header class="card__head">
-          <h3 class="card__title">Yearly Profiles</h3>
+          <h3 class="card__title">Yearly Trends</h3>
           <div class="card__actions">
             <button class="btn" onclick="document.getElementById('frame3').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
             <button class="btn" onclick="fullscreen(document.getElementById('frame3'))">Fullscreen</button>
@@ -378,7 +450,7 @@
           src="img/multiple.html"
           loading="lazy"
           referrerpolicy="no-referrer"
-          aria-label="MSCI World diagram - Yearly Profiles">
+          aria-label="MSCI World diagram - Yearly Trends">
         </iframe>
       </article>
 
@@ -443,7 +515,7 @@
 
   <footer class="footer" role="contentinfo">
     <span>&copy; <span id="yy"></span> ShowMeMSCI.com</span>
-    <span>
+    <span class="footer__links">
       <a href="https://github.com/alexanderblinn/showmemsci" target="_blank" rel="noopener noreferrer">Open Source on GitHub</a>
     </span>
   </footer>

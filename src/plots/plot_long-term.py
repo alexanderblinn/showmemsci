@@ -1,158 +1,171 @@
+"""
+Render long-horizon MSCI World return ranges in the shared editorial theme.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+import theme
 
 WORKING_DIR = Path.cwd()
-FILE_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
+DATA_PATH = WORKING_DIR / "src" / "data" / "raw" / "MSCI_World_daily.csv"
 SAVE_HTML_TO = WORKING_DIR / "img" / "long-term.html"
 
-df = pd.read_csv(
-    FILE_PATH, sep=",", skiprows=[1, 2], header=0, index_col=0, parse_dates=True
-).rename_axis("Date")
 
-last = df.resample("YE").last()
-returns = last["Close"].pct_change().dropna().to_frame("Return")
-returns.index = returns.index.year
-returns = returns[returns.index < 2025]
+def load_holding_period_returns() -> pd.DataFrame:
+    """Load yearly MSCI returns and compute rolling annualized holding periods."""
+    df = pd.read_csv(
+        DATA_PATH,
+        sep=",",
+        skiprows=[1, 2],
+        header=0,
+        index_col=0,
+        parse_dates=True,
+    ).rename_axis("Date")
 
-# Number of holding periods possible
-N_YEARS = returns.index.max() - returns.index.min() + 1
+    yearly = df.resample("YE").last()
+    returns = yearly["Close"].pct_change().dropna().to_frame("Return")
+    returns.index = returns.index.year
+    returns = returns[returns.index < 2026]
 
-for h in range(N_YEARS):
-    window = h + 1
-    # Annualized (geometric mean)
-    returns[f"Return_{h}"] = (
-        (returns["Return"] + 1)
-        .rolling(window=window, min_periods=window)
-        .apply(lambda x: x.prod() ** (1 / window), raw=True)
-        .shift(-h)
-        .sub(1)
+    max_horizon = returns.index.max() - returns.index.min() + 1
+    one_plus = returns["Return"] + 1
+
+    for horizon in range(max_horizon):
+        window = horizon + 1
+        returns[f"Return_{horizon}"] = (
+            one_plus.rolling(window=window, min_periods=window)
+            .apply(lambda values: values.prod() ** (1 / window), raw=True)
+            .shift(-horizon)
+            .sub(1)
+        )
+
+    return returns.drop(columns=["Return"])
+
+
+def build_figure(returns: pd.DataFrame) -> tuple[go.Figure, dict[str, str]]:
+    """Build the long-horizon return envelope figure."""
+    horizons = list(range(1, len(returns.columns) + 1))
+    lower = returns.min(axis=0).mul(100).round(2)
+    upper = returns.max(axis=0).mul(100).round(2)
+    average = returns.mean(axis=0).mul(100).round(2)
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=horizons,
+            y=upper,
+            mode="lines",
+            line=dict(color=theme.POSITIVE, width=2.8),
+            hovertemplate="<b>Upper bound</b><br>%{y:+.2f}%<extra></extra>",
+            name="Upper bound",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=horizons,
+            y=lower,
+            mode="lines",
+            fill="tonexty",
+            fillcolor="rgba(88, 122, 134, 0.08)",
+            line=dict(color=theme.NEGATIVE_SOFT, width=2.4),
+            hovertemplate="<b>Lower bound</b><br>%{y:+.2f}%<extra></extra>",
+            name="Lower bound",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=horizons,
+            y=average,
+            mode="lines",
+            line=dict(color=theme.NEUTRAL, width=3.6),
+            hovertemplate="<b>Average</b><br>%{y:+.2f}%<extra></extra>",
+            name="Average",
+            showlegend=False,
+        )
     )
 
-returns = returns.drop(columns=["Return"])
-print(returns.head())
-
-idx = list(range(1, len(returns.columns) + 1))
-returns_lower = returns.min(axis=0).values * 100
-returns_upper = returns.max(axis=0).values * 100
-returns_avg = returns.mean(axis=0).values * 100
-assert len(idx) == len(returns_lower) == len(returns_upper) == len(returns_avg)
-
-
-# %%
-fig = go.Figure()
-
-# PARAMETERS
-LINE_WIDTH = 5
-hovertemplate = "%{y:.2f}%"
-
-fig.add_trace(
-    go.Scatter(
-        x=idx,
-        y=returns_lower,
-        mode="lines",
-        line=dict(color="#581845", width=LINE_WIDTH),
-        opacity=1,
-        name="Lower Bound",
-        hoverinfo="text",
-        hovertemplate=hovertemplate,
-        showlegend=False,
+    theme.apply_to_figure(
+        fig,
+        margin=dict(l=44, r=22, t=26, b=54),
+        hovermode="x unified",
+        xaxis=dict(
+            title=dict(
+                text="Holding period in years",
+                font=dict(size=12, color=theme.MUTED),
+            ),
+            hoverformat=".0f",
+            ticksuffix=" years",
+            showticksuffix="all",
+            range=[1, horizons[-1]],
+            tick0=1,
+            dtick=5,
+            fixedrange=True,
+            showgrid=False,
+            zeroline=False,
+            showline=False,
+            tickfont=dict(size=11, color="#4C5660"),
+        ),
+        yaxis=dict(
+            title=dict(
+                text="Annualized return",
+                font=dict(size=12, color=theme.MUTED),
+            ),
+            hoverformat=".2f",
+            ticksuffix="%",
+            fixedrange=True,
+            showgrid=True,
+            gridcolor=theme.GRID_SOFT,
+            zeroline=True,
+            zerolinecolor=theme.GRID,
+            showline=False,
+            tickfont=dict(size=11, color="#4C5660"),
+        ),
     )
-)
 
-fig.add_trace(
-    go.Scatter(
-        x=idx,
-        y=returns_upper,
-        mode="lines",
-        line=dict(color="#186C6C", width=LINE_WIDTH),
-        opacity=1,
-        name="Upper Bound",
-        hoverinfo="text",
-        hovertemplate=hovertemplate,
-        showlegend=False,
+    summary = {
+        "horizon": f"Up to {horizons[-1]} years",
+        "start": f"Start year {int(returns.index.min())}",
+        "one_year": f"1Y avg {average.iloc[0]:+.1f}%",
+        "ten_year": (
+            f"10Y avg {average.iloc[9]:+.1f}%"
+            if len(average) >= 10
+            else f"{len(average)}Y avg {average.iloc[-1]:+.1f}%"
+        ),
+    }
+    return fig, summary
+
+
+def main() -> None:
+    """Render the themed long-term HTML asset."""
+    returns = load_holding_period_returns()
+    fig, summary = build_figure(returns)
+    theme.render_html(
+        fig,
+        SAVE_HTML_TO,
+        eyebrow="MSCI World Index",
+        title="Long-Horizon Return Envelope",
+        deck=(
+            "The chart compresses every rolling holding period into three lines: "
+            "the best annualized outcome, the worst, and the average. The spread "
+            "narrows as the holding period extends and short-term noise fades."
+        ),
+        kicker="",
+        meta_items=[
+            summary["horizon"],
+            summary["start"],
+            summary["one_year"],
+            summary["ten_year"],
+        ],
+        footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
+        footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
     )
-)
 
-fig.add_trace(
-    go.Scatter(
-        x=idx,
-        y=returns_avg,
-        mode="lines",
-        line=dict(color="#E4D39D", width=LINE_WIDTH),
-        opacity=1,
-        name="Average Return",
-        hoverinfo="text",
-        hovertemplate=hovertemplate,
-        showlegend=False,
-    )
-)
 
-fig.update_layout(
-    title="Long‑Term Saving Harnesses Regression Toward the Mean",
-    xaxis=dict(
-        title="Holding Period in Years",
-        range=[1, idx[-1]],
-        tick0=0,
-        dtick=5,
-        ticksuffix=" years",
-        showline=True,
-        linewidth=0.5,
-        linecolor="black",
-        zeroline=True,
-        zerolinecolor="black",
-        fixedrange=True,
-        showgrid=False,
-    ),
-    yaxis=dict(
-        title="Average Return (nominal) in Percent",
-        ticksuffix="%",
-        tickformat=".0f%",
-        showline=True,
-        linewidth=0.5,
-        linecolor="black",
-        zeroline=True,
-        zerolinecolor="black",
-        showgrid=True,
-        gridcolor="lightgrey",
-        # range=[ymin, ymax],
-        fixedrange=True,
-    ),
-    hovermode="x unified",
-    hoverlabel=dict(bgcolor="white"),
-    plot_bgcolor="rgba(0,0,0,0)",
-    paper_bgcolor="rgba(0,0,0,0)",
-)
-
-fig.add_annotation(
-    x=1,
-    y=1,
-    xref="paper",
-    yref="paper",
-    text="Beschreibung fehlt noch<br>"
-    "Data source: MSCI World Index via Yahoo Finance (Ticker: ^990100-USD-STRD)<br>"
-    "Visualization by Alexander Blinn",
-    showarrow=False,
-    font=dict(size=8, color="black"),
-    xanchor="right",
-    yanchor="top",
-    align="right",
-    # bordercolor="black",
-    # borderwidth=1,
-    # borderpad=4,
-    # bgcolor="white",
-    # opacity=0.8,
-)
-
-# Export to HTML
-fig.write_html(
-    SAVE_HTML_TO,
-    config={
-        "displayModeBar": True,  # set to False to hide the toolbar completely
-        "modeBarButtonsToRemove": ["select2d", "lasso2d"],  # remove selection tools
-        "scrollZoom": False,  # disable scroll-to-zoom
-        "doubleClick": "reset",  # customize double-click behavior (e.g., reset axes)
-        "displaylogo": False,  # hide the Plotly logo
-    },
-)
+if __name__ == "__main__":
+    main()

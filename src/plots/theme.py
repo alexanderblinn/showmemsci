@@ -459,7 +459,7 @@ def render_html(
     window.addEventListener("load", function () {{
       const chart = document.getElementById("chart");
       const shell = document.querySelector(".chart-shell");
-      const barTextBreakpoint = {responsive_bar_text_breakpoint if responsive_bar_text_breakpoint is not None else 'null'};
+      const barTextBreakpoint = {responsive_bar_text_breakpoint if responsive_bar_text_breakpoint is not None else "null"};
       if (!chart) return;
 
       const applyFinish = function () {{
