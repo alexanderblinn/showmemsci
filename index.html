@@ -9,7 +9,7 @@
   <title>ShowMeMSCI | MSCI World Index Charts</title>
   <meta
     name="description"
-    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, holding-period return envelope, and return triangle." />
+    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return distributions, return bands, holding-period return envelope, and return triangle." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <link rel="canonical" href="https://showmemsci.com/" />
   <meta property="og:type" content="website" />
@@ -17,13 +17,13 @@
   <meta property="og:title" content="ShowMeMSCI | MSCI World Index Charts" />
   <meta
     property="og:description"
-    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, holding-period return envelope, and return triangle." />
+    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return distributions, return bands, holding-period return envelope, and return triangle." />
   <meta property="og:url" content="https://showmemsci.com/" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="ShowMeMSCI | MSCI World Index Charts" />
   <meta
     name="twitter:description"
-    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, holding-period return envelope, and return triangle." />
+    content="Interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return distributions, return bands, holding-period return envelope, and return triangle." />
   <style>
     :root {
       --ink: #23303b;
@@ -425,6 +425,7 @@
           <a href="#g4">Long-Horizon Return Envelope</a>
           <a href="#g5">Annual Returns</a>
           <a href="#g6">Return Triangle</a>
+          <a href="#g7">Return Distribution</a>
         </nav>
         <a
           class="support-link"
@@ -444,7 +445,7 @@
     <section class="hero" aria-describedby="intro">
       <p class="eyebrow">Global equities across cycles</p>
       <h1>MSCI World Index</h1>
-      <p id="intro">Six interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return bands, the holding-period return envelope, and the return triangle.</p>
+      <p id="intro">Seven interactive MSCI World charts covering the long-term trend, yearly paths, annual returns, return distributions, return bands, the holding-period return envelope, and the return triangle.</p>
       <p class="hero__note">On mobile devices, desktop mode is recommended.</p>
     </section>
 
@@ -562,6 +563,25 @@
           loading="lazy"
           referrerpolicy="no-referrer"
           aria-label="MSCI World diagram - Return Triangle">
+        </iframe>
+      </article>
+
+      <article id="g7" class="card">
+        <header class="card__head">
+          <h3 class="card__title">Return Distribution</h3>
+          <div class="card__actions">
+            <button class="btn" onclick="document.getElementById('frame7').scrollIntoView({behavior:'smooth', block:'center'})">Focus</button>
+            <button class="btn" onclick="fullscreen(document.getElementById('frame7'))">Fullscreen</button>
+            <button class="btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">Back to top</button>
+          </div>
+        </header>
+        <iframe
+          id="frame7"
+          class="frame"
+          src="img/dist.html"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          aria-label="MSCI World diagram - Return Distribution">
         </iframe>
       </article>
     </section>

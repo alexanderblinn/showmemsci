@@ -240,6 +240,7 @@ def render_html(
     footer_left: str,
     footer_right: str,
     config: dict | None = None,
+    include_mathjax: bool | str = False,
     responsive_bar_text_breakpoint: int | None = None,
     extra_script: str | None = None,
 ) -> None:
@@ -248,6 +249,7 @@ def render_html(
         fig,
         full_html=False,
         include_plotlyjs=False,
+        include_mathjax=include_mathjax,
         config=config or PLOTLY_CONFIG,
         div_id="chart",
     )
