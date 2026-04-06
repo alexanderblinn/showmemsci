@@ -601,39 +601,16 @@
   <script>
     const frames = Array.from(document.querySelectorAll('.frame'));
 
-    function applyFrameHeight(frame, height) {
-      const nextHeight = `${Math.ceil(height)}px`;
-      frame.dataset.autoHeight = nextHeight;
-      if (document.fullscreenElement !== frame) {
-        frame.style.height = nextHeight;
-      }
-    }
-
     frames.forEach(frame => {
       frame.addEventListener('load', () => {
         frame.classList.add('is-ready');
       });
     });
 
-    window.addEventListener('message', event => {
-      if (!event.data || event.data.type !== 'showmemsci:frame-height') return;
-
-      const frame = frames.find(candidate => candidate.contentWindow === event.source);
-      const height = Number(event.data.height);
-      if (!frame || !Number.isFinite(height) || height < 320) return;
-
-      applyFrameHeight(frame, height);
-    });
-
     document.addEventListener('fullscreenchange', () => {
       frames.forEach(frame => {
         if (document.fullscreenElement === frame) {
           frame.style.height = '100vh';
-          return;
-        }
-
-        if (frame.dataset.autoHeight) {
-          frame.style.height = frame.dataset.autoHeight;
           return;
         }
 
