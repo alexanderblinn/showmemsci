@@ -236,6 +236,8 @@ def main() -> None:
         ],
         footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
         footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
+        chart_shell_height=1000,
+        chart_shell_height_mobile=960,
     )
 
 

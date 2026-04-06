@@ -611,14 +611,27 @@
 
     frames.forEach(frame => {
       frame.addEventListener('load', () => {
-        frame.classList.add('is-ready');
+        window.setTimeout(() => {
+          if (!frame.classList.contains('is-ready')) {
+            frame.classList.add('is-ready');
+          }
+        }, 2500);
       });
     });
 
     window.addEventListener('message', event => {
-      if (!event.data || event.data.type !== 'showmemsci:frame-height') return;
+      if (!event.data) return;
 
       const frame = frames.find(candidate => candidate.contentWindow === event.source);
+      if (!frame) return;
+
+      if (event.data.type === 'showmemsci:frame-ready') {
+        frame.classList.add('is-ready');
+        return;
+      }
+
+      if (event.data.type !== 'showmemsci:frame-height') return;
+
       const height = Number(event.data.height);
       if (!frame || !Number.isFinite(height) || height < 320) return;
 

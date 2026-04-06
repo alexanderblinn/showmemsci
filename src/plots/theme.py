@@ -240,6 +240,8 @@ def render_html(
     footer_left: str,
     footer_right: str,
     config: dict | None = None,
+    chart_shell_height: int = 620,
+    chart_shell_height_mobile: int = 620,
     include_mathjax: bool | str = False,
     responsive_bar_text_breakpoint: int | None = None,
     extra_script: str | None = None,
@@ -290,6 +292,8 @@ def render_html(
       --muted: rgba(35, 48, 59, 0.68);
       --line: rgba(35, 48, 59, 0.12);
       --shadow: 0 20px 48px rgba(18, 24, 30, 0.16);
+      --chart-shell-height: {chart_shell_height}px;
+      --chart-shell-height-mobile: {chart_shell_height_mobile}px;
     }}
 
     * {{
@@ -299,10 +303,10 @@ def render_html(
     html,
     body {{
       width: 100%;
-      height: 100%;
-      min-height: 100vh;
+      height: auto;
+      min-height: 100%;
       margin: 0;
-      overflow: hidden;
+      overflow: visible;
       color: var(--ink);
       background:
         radial-gradient(110% 90% at 100% 0%, rgba(104, 132, 138, 0.10), transparent 46%),
@@ -325,11 +329,11 @@ def render_html(
     }}
 
     .sheet {{
-      height: 100vh;
-      min-height: 100vh;
+      height: auto;
+      min-height: 100%;
       padding: 16px 18px 14px;
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: auto auto auto auto;
       gap: 10px;
     }}
 
@@ -400,7 +404,8 @@ def render_html(
     }}
 
     .chart-shell {{
-      min-height: 0;
+      height: var(--chart-shell-height);
+      min-height: var(--chart-shell-height);
       overflow: hidden;
       border-radius: 20px;
       border: 1px solid rgba(35, 48, 59, 0.10);
@@ -449,6 +454,11 @@ def render_html(
     }}
 
     @media (max-width: 760px) {{
+      .chart-shell {{
+        height: var(--chart-shell-height-mobile);
+        min-height: var(--chart-shell-height-mobile);
+      }}
+
       .title-row {{
         display: grid;
         gap: 8px;
@@ -494,6 +504,7 @@ def render_html(
       const chart = document.getElementById("chart");
       const shell = document.querySelector(".chart-shell");
       const barTextBreakpoint = {responsive_bar_text_breakpoint if responsive_bar_text_breakpoint is not None else "null"};
+      let frameReadySent = false;
       if (!chart) return;
 
       const applyFinish = function () {{
@@ -504,20 +515,42 @@ def render_html(
 
       const reportFrameHeight = function () {{
         if (window.self === window.top) return;
-        const docEl = document.documentElement;
-        const body = document.body;
-        const height = Math.max(
-          docEl ? docEl.scrollHeight : 0,
-          docEl ? docEl.offsetHeight : 0,
-          body ? body.scrollHeight : 0,
-          body ? body.offsetHeight : 0
-        );
+        const sheet = document.querySelector(".sheet");
+        let height = 0;
+
+        if (sheet) {{
+          const sheetRect = sheet.getBoundingClientRect();
+          const sheetStyle = window.getComputedStyle(sheet);
+          const paddingBottom = Number.parseFloat(sheetStyle.paddingBottom) || 0;
+          const contentBottom = Array.from(sheet.children).reduce(function (maxBottom, child) {{
+            return Math.max(maxBottom, child.getBoundingClientRect().bottom);
+          }}, sheetRect.top);
+          height = Math.ceil(contentBottom - sheetRect.top + paddingBottom);
+        }}
+
+        if (!height) {{
+          const docEl = document.documentElement;
+          const body = document.body;
+          height = Math.max(
+            docEl ? docEl.scrollHeight : 0,
+            body ? body.scrollHeight : 0
+          );
+        }}
+
         if (height > 0) {{
           window.parent.postMessage({{
             type: "showmemsci:frame-height",
             height: height
           }}, "*");
         }}
+      }};
+
+      const reportFrameReady = function () {{
+        if (frameReadySent || window.self === window.top) return;
+        frameReadySent = true;
+        window.parent.postMessage({{
+          type: "showmemsci:frame-ready"
+        }}, "*");
       }};
 
       const syncBarText = function () {{
@@ -541,6 +574,7 @@ def render_html(
       const syncPlotSize = function () {{
         if (!shell || !window.Plotly) {{
           reportFrameHeight();
+          reportFrameReady();
           return;
         }}
         Plotly.relayout(chart, {{
@@ -549,7 +583,8 @@ def render_html(
         }})
           .then(syncBarText)
           .then(applyFinish)
-          .then(reportFrameHeight);
+          .then(reportFrameHeight)
+          .then(reportFrameReady);
       }};
 
       syncPlotSize();
