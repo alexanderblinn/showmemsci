@@ -290,8 +290,8 @@
     .frame {
       display: block;
       width: 100%;
-      aspect-ratio: 16 / 11;
-      min-height: 500px;
+      height: 840px;
+      min-height: 840px;
       border: none;
       background: #f1ece1;
       border-radius: 0 0 var(--radius) var(--radius);
@@ -300,8 +300,8 @@
     }
 
     .frame--tall {
-      aspect-ratio: 16 / 20;
-      min-height: 680px;
+      height: 1120px;
+      min-height: 1120px;
     }
 
     .frame.is-ready {
@@ -388,11 +388,13 @@
 
     @media (max-width: 760px) {
       .frame {
-        min-height: 540px;
+        height: 760px;
+        min-height: 760px;
       }
 
       .frame--tall {
-        min-height: 760px;
+        height: 1120px;
+        min-height: 1120px;
       }
 
       .footer {
