@@ -502,6 +502,24 @@ def render_html(
         }});
       }};
 
+      const reportFrameHeight = function () {{
+        if (window.self === window.top) return;
+        const docEl = document.documentElement;
+        const body = document.body;
+        const height = Math.max(
+          docEl ? docEl.scrollHeight : 0,
+          docEl ? docEl.offsetHeight : 0,
+          body ? body.scrollHeight : 0,
+          body ? body.offsetHeight : 0
+        );
+        if (height > 0) {{
+          window.parent.postMessage({{
+            type: "showmemsci:frame-height",
+            height: height
+          }}, "*");
+        }}
+      }};
+
       const syncBarText = function () {{
         if (!window.Plotly || barTextBreakpoint === null) return Promise.resolve();
         const barIndices = chart.data
@@ -521,17 +539,35 @@ def render_html(
       }};
 
       const syncPlotSize = function () {{
-        if (!shell || !window.Plotly) return;
+        if (!shell || !window.Plotly) {{
+          reportFrameHeight();
+          return;
+        }}
         Plotly.relayout(chart, {{
           width: Math.max(320, shell.clientWidth - 2),
           height: Math.max(320, shell.clientHeight - 2)
         }})
           .then(syncBarText)
-          .then(applyFinish);
+          .then(applyFinish)
+          .then(reportFrameHeight);
       }};
 
       syncPlotSize();
       window.addEventListener("resize", syncPlotSize);
+      window.addEventListener("load", reportFrameHeight);
+      window.setTimeout(reportFrameHeight, 160);
+      window.setTimeout(reportFrameHeight, 700);
+
+      if (window.ResizeObserver) {{
+        const resizeObserver = new ResizeObserver(reportFrameHeight);
+        resizeObserver.observe(document.documentElement);
+        if (document.body) {{
+          resizeObserver.observe(document.body);
+        }}
+        if (shell) {{
+          resizeObserver.observe(shell);
+        }}
+      }}
 
       if (chart.on) {{
         chart.on("plotly_afterplot", applyFinish);

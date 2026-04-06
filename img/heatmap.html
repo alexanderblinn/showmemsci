@@ -24,7 +24,6 @@
       --muted: rgba(35, 48, 59, 0.68);
       --line: rgba(35, 48, 59, 0.12);
       --shadow: 0 20px 48px rgba(18, 24, 30, 0.16);
-      --responsive-chart-height: clamp(720px, 140vw, 980px);
     }
 
     * {
@@ -181,30 +180,6 @@
 
     .js-plotly-plot .plotly .modebar {
       display: none !important;
-    }
-
-    @media (max-width: 1024px) {
-      html,
-      body {
-        height: auto;
-        min-height: 0;
-        overflow: visible;
-      }
-
-      body::before {
-        position: absolute;
-      }
-
-      .sheet {
-        height: auto;
-        min-height: 0;
-        grid-template-rows: auto auto auto auto;
-      }
-
-      .chart-shell {
-        height: var(--responsive-chart-height);
-        min-height: var(--responsive-chart-height);
-      }
     }
 
     @media (max-width: 760px) {
