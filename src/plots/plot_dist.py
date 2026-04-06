@@ -461,7 +461,7 @@ def main() -> None:
             summary["days"],
             summary["months"],
             summary["years"],
-            summary["worst_day"],
+            # summary["worst_day"],
         ],
         footer_left="www.ShowMeMSCI.com | @Alexander Blinn",
         footer_right="Data: MSCI World (^990100-USD-STRD) via Yahoo Finance",
